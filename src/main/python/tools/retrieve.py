@@ -25,8 +25,9 @@ load_dotenv()
 SERPER_API_KEY = os.getenv("SERPER_API_KEY")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
-# Load media bias data 
-with open("src/tools/media_bias_data.json", "r", encoding="utf-8") as file:
+# Load media bias data
+_MEDIA_BIAS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "media_bias_data.json")
+with open(_MEDIA_BIAS_PATH, "r", encoding="utf-8") as file:
     MEDIA_DATA = json.load(file)
 
 # Create a dictionary for efficient URL lookup
@@ -62,7 +63,7 @@ class SearchEngineRetriever:
 
 
     def _query_search_server(self, query_term):
-        payload = json.dumps({"q": query_term, "num": 10, "tbs": f"cdr:1,cd_min:,cd_max:{DATASET_DATE_LIMITS["self.dataset"]}"})
+        payload = json.dumps({"q": query_term, "num": 10, "tbs": f"cdr:1,cd_min:,cd_max:{DATASET_DATE_LIMITS.get(self.dataset, '')}"})
         headers = {
             'X-API-KEY': SERPER_API_KEY,
             'Content-Type': 'application/json'

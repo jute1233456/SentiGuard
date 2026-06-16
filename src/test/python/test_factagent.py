@@ -2,7 +2,13 @@
 给一系列真实和虚假的claim，测试其事实核查能力！
 """
 import json
+import os
 import re
+import sys
+
+# 把项目根目录加入 sys.path，使得 `src.main.python.xxx` 绝对导入可以正常工作
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
+
 from dotenv import load_dotenv
 
 load_dotenv()
