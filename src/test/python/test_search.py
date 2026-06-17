@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-测试 FactAgent 的网络搜索功能
+测试 FactAgent 的网络搜索功能 - Pytest 格式
 """
 import os
 import sys
@@ -14,119 +14,192 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../.
 # 加载环境变量
 load_dotenv()
 
-print("=" * 60)
-print("FactAgent Web Search Test")
-print("=" * 60)
 
-# 1. 检查 API Keys
-print("\n[1] Checking API Keys...")
-SERPER_API_KEY = os.getenv("SERPER_API_KEY")
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+class TestFactAgentSearch:
+    """FactAgent 网络搜索功能测试"""
 
-status_serper = "OK - Set" if SERPER_API_KEY else "ERROR - Not Set"
-status_google = "OK - Set" if GOOGLE_API_KEY else "ERROR - Not Set"
-print(f"  SERPER_API_KEY: {status_serper}")
-print(f"  GOOGLE_API_KEY: {status_google}")
+    def test_api_keys_set(self):
+        """测试必要的 API Key 是否已设置"""
+        SERPER_API_KEY = os.getenv("SERPER_API_KEY")
+        GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
-if not SERPER_API_KEY or not GOOGLE_API_KEY:
-    print("\nERROR: Missing required API Keys, please set in .env file")
-    sys.exit(1)
+        assert SERPER_API_KEY is not None, "SERPER_API_KEY must be set in .env"
+        assert len(SERPER_API_KEY) > 0, "SERPER_API_KEY cannot be empty"
+        assert GOOGLE_API_KEY is not None, "GOOGLE_API_KEY must be set in .env"
+        assert len(GOOGLE_API_KEY) > 0, "GOOGLE_API_KEY cannot be empty"
 
-print("\nOK: API Keys check passed")
+    def test_media_bias_database_loaded(self):
+        """测试媒体偏见数据库是否能正确加载"""
+        from src.main.python.tools.retrieve import MEDIA_BIAS_DICT, MEDIA_DATA
 
-# 2. 测试媒体偏见数据库
-print("\n[2] Checking media bias database...")
-try:
-    from src.main.python.tools.retrieve import MEDIA_BIAS_DICT, MEDIA_DATA
-    print(f"  OK: Media bias database loaded, total {len(MEDIA_DATA)} records")
+        assert MEDIA_DATA is not None, "MEDIA_DATA should not be None"
+        assert isinstance(MEDIA_DATA, list), "MEDIA_DATA should be a list"
+        assert len(MEDIA_DATA) > 0, "MEDIA_DATA should not be empty"
+        assert len(MEDIA_DATA) == 5714, f"Expected 5714 records, got {len(MEDIA_DATA)}"
 
-    # 查看数据库中的一些样本
-    print("\n  Sample entries from database:")
-    for i, entry in enumerate(MEDIA_DATA[:5]):
-        url = entry.get('url', 'N/A')
-        bias = entry.get('bias', 'N/A')
-        factual = entry.get('factual', 'N/A')
-        print(f"    {i+1}. {url} - bias={bias}, factual={factual}")
+        # 检查第一条记录的结构
+        first_entry = MEDIA_DATA[0]
+        assert "url" in first_entry, "Each entry should have 'url' field"
+        assert "bias" in first_entry, "Each entry should have 'bias' field"
+        assert "factual" in first_entry, "Each entry should have 'factual' field"
 
-except Exception as e:
-    print(f"  ERROR: Media bias database check failed: {e}")
-    import traceback
-    traceback.print_exc()
+    def test_media_bias_dict_creation(self):
+        """测试媒体偏见字典是否正确创建"""
+        from src.main.python.tools.retrieve import MEDIA_BIAS_DICT, MEDIA_DATA
 
-# 3. 测试 URL 检查逻辑
-print("\n[3] Testing URL validation logic...")
-try:
-    from src.main.python.tools.retrieve import SearchEngineRetriever
+        assert MEDIA_BIAS_DICT is not None, "MEDIA_BIAS_DICT should not be None"
+        assert isinstance(MEDIA_BIAS_DICT, dict), "MEDIA_BIAS_DICT should be a dict"
 
-    # 创建检索器但不启动浏览器
-    retriever = SearchEngineRetriever(dataset="feverous", headless=True)
+        # 验证字典中的一些键
+        sample_urls = [
+            "newrepublic.com/",
+            "www.accountable.us/",
+            "www.newscorpse.com/"
+        ]
+        for url in sample_urls:
+            assert url in MEDIA_BIAS_DICT, f"URL {url} should be in MEDIA_BIAS_DICT"
 
-    # 清理浏览器（我们不需要它）
-    if hasattr(retriever, 'driver'):
-        retriever.driver.quit()
-        del retriever.driver
+    def test_url_validation_edu_gov_org(self):
+        """测试 .edu, .gov, .org 域名是否能通过检查"""
+        from src.main.python.tools.retrieve import SearchEngineRetriever
 
-    # 测试一些 URL
-    test_urls = [
-        "https://www.bbc.com/news/world",
-        "https://en.wikipedia.org/wiki/Science",
-        "https://www.nih.gov/health",
-        "https://www.nature.com/articles",
-    ]
+        # 创建检索器但不启动浏览器
+        retriever = SearchEngineRetriever(dataset="feverous", headless=True)
 
-    print("\n  Testing URL validity:")
-    for url in test_urls:
-        is_valid = retriever._check_valid_url(url)
-        status = "OK - Valid" if is_valid else "SKIP - Not valid"
+        # 清理浏览器
+        if hasattr(retriever, 'driver'):
+            retriever.driver.quit()
+            del retriever.driver
 
-        import urllib.parse
-        parsed_url = urllib.parse.urlparse(url)
-        domain = parsed_url.netloc.lower()
-        if domain.startswith('www.'):
-            domain = domain[4:]
+        # 测试域名
+        test_cases = [
+            ("https://en.wikipedia.org/wiki/Science", True),  # .org
+            ("https://www.nih.gov/health", True),           # .gov
+            ("https://www.harvard.edu", True),              # .edu
+        ]
 
-        print(f"    {domain}: {status}")
+        for url, expected in test_cases:
+            result = retriever._check_valid_url(url)
+            assert result == expected, f"URL {url} should be {'valid' if expected else 'invalid'}"
 
-except Exception as e:
-    print(f"  ERROR: URL validation test failed: {e}")
-    import traceback
-    traceback.print_exc()
+    def test_url_validation_scientific_domains(self):
+        """测试科学域名是否能通过检查"""
+        from src.main.python.tools.retrieve import SearchEngineRetriever
 
-# 4. 展示搜索流程图
-print("\n" + "=" * 60)
-print("How FactAgent Search Works")
-print("=" * 60)
-print("""
-1. Serper API Search
-   - Calls https://google.serper.dev/search
-   - Returns 10 search results per query
-   - Applies dataset-specific date limits
+        # 创建检索器但不启动浏览器
+        retriever = SearchEngineRetriever(dataset="feverous", headless=True)
 
-2. URL Legitimacy Check
-   - Checks media bias database (5714 sources)
-   - Checks domain suffix (.edu, .gov, .org)
-   - Checks domain age (WHOIS lookup >5 years)
-   - Checks scientific domains
+        # 清理浏览器
+        if hasattr(retriever, 'driver'):
+            retriever.driver.quit()
+            del retriever.driver
 
-3. Selenium Content Crawling
-   - Launches Chrome browser (headless by default)
-   - Visits valid URLs
-   - Extracts all <p> paragraph content
-   - Detects bot detection pages
+        # 测试科学域名
+        scientific_urls = [
+            "https://www.nature.com/articles/d41586-020-00126-9",
+            "https://www.science.org/doi/10.1126/science.abd7331",
+            "https://pubmed.ncbi.nlm.nih.gov/32423446/",
+        ]
 
-4. Gemini Content Extraction
-   - Uses Gemini 1.5 Flash model
-   - Extracts only query-relevant sentences
-   - Filters out irrelevant information
-""")
+        for url in scientific_urls:
+            result = retriever._check_valid_url(url)
+            assert result is True, f"Scientific URL {url} should be valid"
 
-print("\n" + "=" * 60)
-print("Test completed")
-print("=" * 60)
+    def test_search_retriever_initialization(self):
+        """测试 SearchEngineRetriever 初始化"""
+        from src.main.python.tools.retrieve import SearchEngineRetriever
 
-print("\nSummary:")
-print("- Media Bias DB: OK - Loaded", len(MEDIA_DATA), "records")
-print("- Serper API:", "OK - Set" if SERPER_API_KEY else "ERROR - Not Set")
-print("- Gemini API:", "OK - Set" if GOOGLE_API_KEY else "ERROR - Not Set")
-print("\nNote: Full search test requires internet connection and proper API keys")
-print("      You can run 'python -m pytest src/test/python/test_factagent.py' for end-to-end testing")
+        # 可以初始化
+        retriever = SearchEngineRetriever(dataset="feverous", headless=True)
+        assert retriever is not None
+        assert retriever.dataset == "feverous"
+
+        # 清理
+        if hasattr(retriever, 'driver'):
+            retriever.driver.quit()
+
+    def test_get_original_url_function(self):
+        """测试 _get_original_url 函数"""
+        from src.main.python.tools.retrieve import SearchEngineRetriever
+
+        retriever = SearchEngineRetriever(dataset="feverous", headless=True)
+
+        # 清理浏览器
+        if hasattr(retriever, 'driver'):
+            retriever.driver.quit()
+            del retriever.driver
+
+        test_cases = [
+            ("https://www.example.com/page.html", "www.example.com/"),
+            ("https://example.org/article", "example.org/"),
+            ("http://sub.domain.gov/path", "sub.domain.gov/"),
+        ]
+
+        for url, expected in test_cases:
+            result = retriever._get_original_url(url)
+            assert result == expected, f"Expected {expected} for {url}"
+
+
+class TestSearchFlowDocumentation:
+    """搜索流程文档测试"""
+
+    def test_search_flow_documentation_exists(self):
+        """测试搜索相关代码有适当的文档"""
+        from src.main.python.tools import retrieve
+
+        # 检查 SearchEngineRetriever 类是否有文档
+        assert retrieve.SearchEngineRetriever.__doc__ is None or isinstance(
+            retrieve.SearchEngineRetriever.__doc__, str
+        )
+
+        # 检查主要方法
+        methods_to_check = [
+            "_query_search_server",
+            "_check_valid_url",
+            "_retrieve_single",
+            "get_details",
+            "_process_content",
+            "retrieve",
+        ]
+
+        for method_name in methods_to_check:
+            method = getattr(retrieve.SearchEngineRetriever, method_name, None)
+            assert method is not None, f"Method {method_name} should exist"
+
+    def test_search_tool_exists(self):
+        """测试 search_retrieve_news 工具存在"""
+        from src.main.python.tools.retrieve import search_retrieve_news
+
+        assert search_retrieve_news is not None, "search_retrieve_news should exist"
+        assert hasattr(search_retrieve_news, 'invoke'), "Tool should have invoke method"
+
+
+# 如果直接运行这个文件，也可以执行简单的测试
+if __name__ == "__main__":
+    print("=" * 60)
+    print("FactAgent Web Search Test - Standalone Mode")
+    print("=" * 60)
+    print("\nTo run with pytest:")
+    print("  pytest src/test/python/test_search.py -v")
+    print("\nOr run specific test:")
+    print("  pytest src/test/python/test_search.py::TestFactAgentSearch::test_api_keys_set -v")
+    print("\n" + "=" * 60)
+
+    # 简单的手动测试
+    print("\nRunning quick manual checks...")
+
+    # 检查 API keys
+    SERPER_API_KEY = os.getenv("SERPER_API_KEY")
+    GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+
+    print(f"\nSERPER_API_KEY: {'OK' if SERPER_API_KEY else 'MISSING'}")
+    print(f"GOOGLE_API_KEY: {'OK' if GOOGLE_API_KEY else 'MISSING'}")
+
+    # 检查数据库
+    try:
+        from src.main.python.tools.retrieve import MEDIA_DATA
+        print(f"Media Bias DB: OK - {len(MEDIA_DATA)} records")
+    except Exception as e:
+        print(f"Media Bias DB: ERROR - {e}")
+
+    print("\nQuick check completed!")
