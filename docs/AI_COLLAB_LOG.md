@@ -623,17 +623,44 @@
 
 ---
 
+### 条目 #29 — 豆包API Key优先级调整为环境变量优先
+
+- **日期**：2026-06-17
+- **场景**：配置优化 / 环境变量管理
+- **关键 Prompt**：
+  > "修改豆包模型，优先使用环境中获取的apikey，实在没有再从env获取"
+  > （确认需求后）"对对"
+- **AI 产出**：
+  - 修改`doubao_client.py`的API Key解析优先级：
+    - 优先级1：环境变量`DOUBAO_API_KEY`
+    - 优先级2：环境变量`ARK_API_KEY`（向后兼容）
+    - 优先级3：构造函数直接传入的`api_key`参数
+  - 同样调整Base URL的解析优先级：
+    - 优先级1：环境变量`DOUBAO_BASE_URL`
+    - 优先级2：环境变量`ARK_BASE_URL`
+    - 优先级3：构造函数直接传入的`base_url`参数
+    - 优先级4：默认值
+  - 更新注释文档，明确新的优先级顺序
+- **人工修改**：无
+- **风险控制**：
+  - 保持向后兼容，`ARK_*`环境变量仍然有效
+  - 传入参数仍然作为备选方案，不破坏现有代码
+  - 清晰的注释说明优先级顺序
+- **价值**：环境变量配置优先，更符合部署最佳实践，便于统一管理配置
+
+---
+
 ## 阶段性统计（自动维护，每次新增条目时更新）
 
 | 项 | 值 |
 |----|----|
-| 累计条目数 | 28 |
+| 累计条目数 | 29 |
 | 涉及场景类别 | 代码理解、需求分析、接口设计、代码生成、文档撰写、算法理解、知识 Q&A、版本控制、字段精简、文档代码同步、架构调整、验证测试、交付总结、数据源验证、团队协作、数据源扩展、业务功能、数据采集、代码替换、功能完善、项目维护、配置优化、环境变量管理、向后兼容 |
 | 已生成代码文件 | 19（api/*7 + hot_topic/scripts/train_thucnews_improved.py + train_thucnews_simple.py + topic_model_config.py + topic_model_trainer.py + example_usage.py + hot_topic/data_source/rss_client.py + hot_topic/scripts/fetch_recent_news.py + 原hot_topic模块） |
 | 新增核心文件 | 7（topic_model_config.py、topic_model_trainer.py、example_usage.py、train_thucnews_improved.py、rss_client.py、fetch_recent_news.py、doubao_client.py改进） |
 | 已生成文档文件 | 6（docs/api/internal-api.md、docs/AI_COLLAB_LOG.md、hot_topic/TRAINING_GUIDE.md、README_PYTHON_API.md、THUCNEWS_BERTOPIC_README.md、.env.example） |
 | Git 提交次数 | 7（67eaabd → a3284db → b8e8a8a → b93eb9e → b961c32 → d5fd6c0 → 7d7e299） |
-| 人工干预次数 | ≥ 9（范围收敛、字段精简×2、算法质疑、提交把关、任务书排除、语言检测修复、GDELT跳过、API Key配置要求） |
+| 人工干预次数 | ≥ 10（范围收敛、字段精简×2、算法质疑、提交把关、任务书排除、语言检测修复、GDELT跳过、API Key配置要求、优先级调整） |
 | 训练阶段完成 | small预设测试训练完成 |
 | 支持主题数 | 默认50个，可配置 |
 | 数据源支持 | GDELT、RSS、THUCNews |
