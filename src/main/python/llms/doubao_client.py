@@ -34,12 +34,19 @@ class DoubaoLLM(BaseLLM):
                  api_key: Optional[str] = None,
                  base_url: Optional[str] = None,
                  temperature: float = 0.2, **kwargs: Any):
-        resolved_key = api_key or os.environ.get("ARK_API_KEY")
+        # API Key 优先级：传入参数 > DOUBAO_API_KEY 环境变量 > ARK_API_KEY 环境变量
+        resolved_key = api_key or os.environ.get("DOUBAO_API_KEY") or os.environ.get("ARK_API_KEY")
         if not resolved_key:
             raise ValueError(
-                "ARK_API_KEY 未提供。请在环境变量或构造参数中设置。"
+                "DOUBAO_API_KEY / ARK_API_KEY 未提供。请在环境变量或构造参数中设置。"
             )
-        resolved_url = base_url or os.environ.get("ARK_BASE_URL") or _DEFAULT_DOUBUO_BASE_URL
+        # Base URL 优先级：传入参数 > DOUBAO_BASE_URL 环境变量 > ARK_BASE_URL 环境变量 > 默认值
+        resolved_url = (
+            base_url
+            or os.environ.get("DOUBAO_BASE_URL")
+            or os.environ.get("ARK_BASE_URL")
+            or _DEFAULT_DOUBUO_BASE_URL
+        )
         super().__init__(model_name=model_name, api_key=resolved_key,
                          base_url=resolved_url, temperature=temperature, **kwargs)
 
