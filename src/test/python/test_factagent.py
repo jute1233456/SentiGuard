@@ -78,33 +78,64 @@ def print_search_details(results):
     print(f"{'='*80}")
 
     found_searches = False
+    found_queries = []
+    found_evidence = []
 
     for i, step in enumerate(results):
         for agent_name, agent_data in step.items():
-            if "messages" in agent_data:
-                for msg in agent_data["messages"]:
-                    msg_content = msg.content if hasattr(msg, 'content') else str(msg)
+            if agent_name == "evidence_seeker":
+                found_searches = True
+                print(f"\n📂 步骤 {i+1} - 证据搜索智能体")
+                print("-" * 80)
 
-                    # 检查是否有搜索相关的内容
-                    if "evidence_seeker" in str(type(msg)) or "search" in msg_content.lower():
-                        found_searches = True
-                        print(f"\n步骤 {i+1} - 证据搜索:")
-                        print("-" * 80)
+                if "messages" in agent_data:
+                    for msg in agent_data["messages"]:
+                        msg_content = msg.content if hasattr(msg, 'content') else str(msg)
 
-                        # 提取搜索查询
-                        if "query" in msg_content.lower():
-                            # 尝试找到搜索查询
-                            lines = msg_content.split('\n')
-                            for line in lines:
-                                if "query" in line.lower() or "question" in line.lower():
-                                    print(f"  📝 {line.strip()}")
+                        # 尝试解析 JSON
+                        try:
+                            parsed = json.loads(msg_content)
+                            if isinstance(parsed, list) and len(parsed) > 0:
+                                data = parsed[0] if isinstance(parsed[0], dict) else parsed
 
-                        # 检查是否有提取到的证据
-                        if "evidence" in msg_content.lower() or "article" in msg_content.lower():
-                            print(f"  📄 找到证据内容")
+                                # 提取查询和证据
+                                if "queries_with_evidence" in data:
+                                    q_e_list = data["queries_with_evidence"]
+                                    for j, item in enumerate(q_e_list):
+                                        query = item.get("query", "")
+                                        evidence = item.get("evidence", "")
+                                        if query:
+                                            print(f"\n  🔎 查询 {j+1}: {query}")
+                                            found_queries.append(query)
+                                        if evidence:
+                                            print(f"  📄 证据: {evidence[:150]}..." if len(evidence) > 150 else f"  📄 证据: {evidence}")
+                                            found_evidence.append(evidence)
+                                elif "questions" in data:
+                                    questions = data["questions"]
+                                    for j, q in enumerate(questions):
+                                        print(f"  📝 问题 {j+1}: {q}")
+                                        found_queries.append(q)
+                                continue
+                        except json.JSONDecodeError:
+                            pass
+
+                        # 如果不是 JSON，尝试查找关键词
+                        if "query" in msg_content.lower() or "evidence" in msg_content.lower():
+                            print(f"  📄 内容摘要: {msg_content[:200]}...")
 
     if not found_searches:
         print("  本次未检测到显式的网络搜索步骤")
+        print("  💡 提示: 可能是因为 Serper API 配额用完了")
+        print("  💡 提示: 证据可能直接来自 LLM 的训练知识")
+    else:
+        print(f"\n📊 搜索统计:")
+        print(f"  找到 {len(found_queries)} 个搜索查询")
+        print(f"  找到 {len(found_evidence)} 条证据")
+
+        if found_queries:
+            print(f"\n  查询列表:")
+            for i, q in enumerate(found_queries):
+                print(f"    {i+1}. {q}")
 
 
 def parse_verdict_from_results(results):
