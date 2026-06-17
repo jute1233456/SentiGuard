@@ -1,0 +1,1738 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SentiGuard - 核查历史</title>
+  <style>
+    :root {
+      --color-bg: #f4f7fb;
+      --color-surface: #ffffff;
+      --color-surface-soft: #f8fbfd;
+      --color-text: #152235;
+      --color-text-subtle: #63748a;
+      --color-border: #dbe5ee;
+      --color-border-soft: #e9eff5;
+      --color-primary: #176fa8;
+      --color-primary-hover: #105986;
+      --color-primary-soft: #e8f4fb;
+      --color-success: #12835a;
+      --color-success-soft: #e2f7ec;
+      --color-danger: #c43d42;
+      --color-danger-soft: #fdecee;
+      --color-warning: #a56908;
+      --color-warning-soft: #fff4d8;
+      --radius-sm: 6px;
+      --radius-md: 8px;
+      --shadow-card: 0 12px 28px rgba(21, 35, 53, 0.08);
+      --shadow-modal: 0 26px 70px rgba(21, 35, 53, 0.22);
+      --space-1: 4px;
+      --space-2: 8px;
+      --space-3: 12px;
+      --space-4: 16px;
+      --space-5: 20px;
+      --space-6: 24px;
+      --transition: 0.18s ease;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--color-text);
+      background: var(--color-bg);
+      font-family: "Microsoft YaHei", Arial, sans-serif;
+    }
+
+    button, input, select { font: inherit; }
+    button { border: 0; cursor: pointer; }
+    button:disabled { cursor: not-allowed; opacity: 0.48; }
+    ::selection { color: #ffffff; background: var(--color-primary); }
+
+    *::-webkit-scrollbar { width: 10px; height: 10px; }
+    *::-webkit-scrollbar-track { background: transparent; }
+    *::-webkit-scrollbar-thumb {
+      border: 3px solid transparent;
+      border-radius: 999px;
+      background: rgba(105, 124, 145, 0.48);
+      background-clip: content-box;
+    }
+
+    .app {
+      min-height: 100vh;
+      display: flex;
+    }
+
+    .sidebar {
+      flex: 0 0 248px;
+      min-height: 100vh;
+      color: #dbe7f0;
+      background: #26384b;
+      border-right: 1px solid #182635;
+    }
+
+    .brand {
+      height: 78px;
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding: 0 var(--space-5);
+      background: #17283a;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .brand-mark {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border-radius: var(--radius-sm);
+      color: #102a3b;
+      background: #f3c84b;
+      font-weight: 900;
+    }
+
+    .brand-name { font-size: 18px; font-weight: 900; line-height: 1.1; }
+    .brand-desc { margin-top: var(--space-1); color: #9eb0bf; font-size: 12px; }
+    .nav-block { padding: 18px 14px; }
+    .nav-title { padding: 0 10px 9px; color: #91a5b6; font-size: 12px; font-weight: 900; }
+
+    .nav-item {
+      min-height: 44px;
+      display: grid;
+      grid-template-columns: 24px 1fr auto;
+      align-items: center;
+      gap: 10px;
+      padding: 0 12px;
+      border-radius: var(--radius-sm);
+      color: #dbe7f0;
+      text-decoration: none;
+      font-weight: 900;
+      transition: background var(--transition), transform var(--transition);
+    }
+
+    .nav-item + .nav-item { margin-top: 5px; }
+    .nav-item:hover { background: rgba(255, 255, 255, 0.08); transform: translateX(2px); }
+    .nav-item.active { background: var(--color-primary); color: #ffffff; }
+
+    .badge {
+      min-width: 42px;
+      height: 22px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 8px;
+      border-radius: 999px;
+      color: #566a7d;
+      background: #e5edf4;
+      font-size: 12px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .badge.live { color: #0a5b3b; background: #cfeedd; }
+
+    .main {
+      flex: 1;
+      min-width: 0;
+      padding: 28px 32px 38px;
+      overflow: auto;
+    }
+
+    .page {
+      max-width: 1520px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-4);
+    }
+
+    .page-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-4);
+    }
+
+    .title-group { min-width: 0; }
+    .eyebrow { margin-bottom: 6px; color: var(--color-primary); font-size: 13px; font-weight: 900; }
+    h1 { margin: 0; color: var(--color-text); font-size: 30px; line-height: 1.25; letter-spacing: 0; }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      height: 38px;
+      min-width: 88px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding: 0 14px;
+      border-radius: var(--radius-sm);
+      color: #ffffff;
+      background: var(--color-primary);
+      font-weight: 900;
+      text-decoration: none;
+      transition: transform var(--transition), box-shadow var(--transition), background var(--transition);
+    }
+
+    .btn:hover:not(:disabled) {
+      transform: translateY(-1px);
+      background: var(--color-primary-hover);
+      box-shadow: 0 10px 20px rgba(23, 111, 168, 0.18);
+    }
+
+    .btn.ghost {
+      color: #24475f;
+      background: #ffffff;
+      border: 1px solid var(--color-border);
+    }
+
+    .btn.ghost:hover:not(:disabled) {
+      background: var(--color-surface-soft);
+      box-shadow: 0 8px 18px rgba(21, 35, 53, 0.08);
+    }
+
+    .btn.danger {
+      color: var(--color-danger);
+      background: var(--color-danger-soft);
+    }
+
+    .btn.icon {
+      min-width: 38px;
+      width: 38px;
+      padding: 0;
+    }
+
+    .card {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-card);
+    }
+
+    .filter-card {
+      padding: var(--space-5);
+    }
+
+    .filter-bar {
+      display: flex;
+      align-items: flex-end;
+      gap: var(--space-3);
+      flex-wrap: wrap;
+    }
+
+    .field {
+      flex: 1 1 150px;
+      min-width: 150px;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .field.keyword {
+      flex: 2 1 300px;
+      min-width: 260px;
+    }
+
+    label {
+      color: #40556b;
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    input, select {
+      width: 100%;
+      height: 40px;
+      padding: 0 12px;
+      border: 1px solid #ccd9e5;
+      border-radius: var(--radius-sm);
+      color: var(--color-text);
+      background: #ffffff;
+      outline: none;
+      transition: border-color var(--transition), box-shadow var(--transition);
+    }
+
+    input:focus, select:focus {
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 4px rgba(23, 111, 168, 0.12);
+    }
+
+    .table-card {
+      overflow: hidden;
+    }
+
+    .table-head {
+      min-height: 62px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-4);
+      padding: var(--space-4) var(--space-5);
+      border-bottom: 1px solid var(--color-border-soft);
+    }
+
+    .section-title {
+      margin: 0;
+      color: var(--color-primary-hover);
+      font-size: 18px;
+      font-weight: 900;
+    }
+
+    .section-sub {
+      margin-top: 4px;
+      color: var(--color-text-subtle);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .table-wrap {
+      width: 100%;
+      overflow: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 1060px;
+    }
+
+    th, td {
+      padding: 15px 16px;
+      border-bottom: 1px solid var(--color-border-soft);
+      text-align: left;
+      vertical-align: middle;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      color: #53677d;
+      background: #f8fbfd;
+      font-size: 12px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    td {
+      color: var(--color-text);
+      font-size: 14px;
+    }
+
+    tbody tr {
+      transition: background var(--transition);
+    }
+
+    tbody tr:hover {
+      background: #f8fbfd;
+    }
+
+    .text-cell {
+      max-width: 360px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-weight: 900;
+    }
+
+    .muted { color: var(--color-text-subtle); font-size: 13px; }
+
+    .tag {
+      min-width: 64px;
+      height: 28px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 10px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .tag.true, .tag.supported, .tag.success { color: var(--color-success); background: var(--color-success-soft); }
+    .tag.false, .tag.not_supported, .tag.failed { color: var(--color-danger); background: var(--color-danger-soft); }
+    .tag.neutral, .tag.pending, .tag.running { color: var(--color-warning); background: var(--color-warning-soft); }
+
+    .risk {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--color-text-subtle);
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    .risk-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--color-warning);
+    }
+
+    .risk.low .risk-dot { background: var(--color-success); }
+    .risk.high .risk-dot { background: var(--color-danger); }
+
+    .row-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: var(--space-2);
+      white-space: nowrap;
+    }
+
+    .pagination {
+      min-height: 62px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-4);
+      padding: var(--space-4) var(--space-5);
+      background: #ffffff;
+    }
+
+    .page-buttons {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+
+    .page-number-list {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .page-number {
+      min-width: 34px;
+      height: 34px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 10px;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      color: #365169;
+      background: #ffffff;
+      font-weight: 900;
+      transition: background var(--transition), color var(--transition), box-shadow var(--transition), transform var(--transition);
+    }
+
+    .page-number:hover:not(:disabled) {
+      transform: translateY(-1px);
+      background: var(--color-primary-soft);
+      box-shadow: 0 8px 18px rgba(21, 35, 53, 0.08);
+    }
+
+    .page-number.active {
+      color: #ffffff;
+      background: var(--color-primary);
+      border-color: var(--color-primary);
+    }
+
+    .empty {
+      min-height: 320px;
+      display: grid;
+      place-items: center;
+      padding: var(--space-6);
+      color: var(--color-text-subtle);
+      text-align: center;
+      line-height: 1.8;
+    }
+
+    .empty-box {
+      max-width: 360px;
+      display: grid;
+      gap: var(--space-2);
+      justify-items: center;
+    }
+
+    .empty-icon {
+      width: 54px;
+      height: 54px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      color: var(--color-primary);
+      background: var(--color-primary-soft);
+      font-size: 24px;
+      font-weight: 900;
+    }
+
+    .skeleton-table {
+      padding: var(--space-5);
+      display: grid;
+      gap: var(--space-3);
+    }
+
+    .skeleton-line {
+      height: 56px;
+      border-radius: var(--radius-sm);
+      background: linear-gradient(90deg, #eef4f8 0%, #fbfdff 48%, #eef4f8 100%);
+      background-size: 220% 100%;
+      animation: shimmer 1.2s ease-in-out infinite;
+      border: 1px solid var(--color-border-soft);
+    }
+
+    @keyframes shimmer {
+      0% { background-position: 120% 0; }
+      100% { background-position: -120% 0; }
+    }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: var(--space-6);
+      background: rgba(15, 27, 40, 0.48);
+    }
+
+    .modal.show {
+      display: flex;
+      animation: fadeIn var(--transition);
+    }
+
+    .dialog {
+      width: min(1040px, 100%);
+      max-height: min(820px, calc(100vh - 48px));
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border-radius: var(--radius-md);
+      background: #ffffff;
+      box-shadow: var(--shadow-modal);
+      animation: slideUp var(--transition);
+    }
+
+    .dialog.confirm-dialog {
+      width: min(460px, 100%);
+    }
+
+    .dialog-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: var(--space-4);
+      padding: var(--space-5) var(--space-6);
+      border-bottom: 1px solid var(--color-border-soft);
+      background: #ffffff;
+    }
+
+    .dialog-title {
+      margin: 0;
+      color: var(--color-text);
+      font-size: 22px;
+      font-weight: 900;
+    }
+
+    .dialog-sub {
+      margin-top: 6px;
+      color: var(--color-text-subtle);
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    .dialog-body {
+      overflow: auto;
+      padding: var(--space-6);
+      background: #f7fafc;
+    }
+
+    .dialog-foot {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: var(--space-2);
+      padding: var(--space-4) var(--space-6);
+      border-top: 1px solid var(--color-border-soft);
+      background: #ffffff;
+    }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 290px;
+      gap: var(--space-4);
+      align-items: start;
+    }
+
+    .detail-main,
+    .detail-aside {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-4);
+    }
+
+    .detail-block {
+      padding: var(--space-5);
+      border: 1px solid var(--color-border-soft);
+      border-radius: var(--radius-md);
+      background: #ffffff;
+    }
+
+    .detail-title {
+      margin-bottom: var(--space-3);
+      color: var(--color-primary-hover);
+      font-size: 16px;
+      font-weight: 900;
+    }
+
+    .detail-text {
+      color: #34495e;
+      line-height: 1.85;
+      font-size: 14px;
+      white-space: pre-wrap;
+    }
+
+    .result-card {
+      color: #ffffff;
+      background: linear-gradient(135deg, #17344e, #176fa8);
+      border: 0;
+    }
+
+    .result-card .detail-title,
+    .result-card .detail-text {
+      color: rgba(255, 255, 255, 0.9);
+    }
+
+    .result-title {
+      margin-bottom: var(--space-2);
+      color: #ffffff;
+      font-size: 20px;
+      font-weight: 900;
+      line-height: 1.5;
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: var(--space-3);
+    }
+
+    .metric {
+      min-height: 82px;
+      display: grid;
+      align-content: center;
+      padding: var(--space-4);
+      border-radius: var(--radius-md);
+      background: #ffffff;
+      border: 1px solid var(--color-border-soft);
+    }
+
+    .metric-value {
+      color: var(--color-text);
+      font-size: 26px;
+      font-weight: 900;
+    }
+
+    .metric-label {
+      margin-top: 4px;
+      color: var(--color-text-subtle);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .claim, .evidence {
+      padding: var(--space-4);
+      border: 1px solid var(--color-border-soft);
+      border-left: 4px solid var(--color-primary);
+      border-radius: var(--radius-sm);
+      background: #ffffff;
+    }
+
+    .claim + .claim,
+    .evidence + .evidence { margin-top: var(--space-3); }
+
+    .evidence-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-3);
+      margin-bottom: var(--space-2);
+    }
+
+    .toast {
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      z-index: 70;
+      max-width: 420px;
+      min-width: 260px;
+      padding: 13px 15px;
+      border-radius: var(--radius-md);
+      color: #ffffff;
+      background: #1f2937;
+      box-shadow: var(--shadow-card);
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(10px);
+      transition: opacity var(--transition), transform var(--transition);
+    }
+
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.error { background: var(--color-danger); }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(18px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 1180px) {
+      .app { display: block; }
+      .sidebar { min-height: auto; }
+      .main { padding: var(--space-5); }
+      .detail-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 760px) {
+      .main { padding: var(--space-4); }
+      .page-header, .table-head, .pagination { align-items: stretch; flex-direction: column; }
+      .toolbar, .page-buttons { width: 100%; }
+      .toolbar .btn, .page-buttons .btn { flex: 1; }
+      .filter-bar { display: flex; flex-direction: column; align-items: stretch; }
+      .field, .field.keyword { min-width: 0; width: 100%; }
+      .dialog { max-height: calc(100vh - 24px); }
+      .modal { padding: var(--space-3); }
+      .dialog-head, .dialog-body { padding: var(--space-4); }
+      .metric-grid { grid-template-columns: 1fr; }
+    }
+
+    /* Refined visual layer */
+    :root {
+      --color-bg: #f3f6fa;
+      --color-text: #182637;
+      --color-text-subtle: #6b7a8d;
+      --color-primary: #2d78a8;
+      --color-primary-hover: #22648e;
+      --color-primary-soft: #edf6fb;
+      --color-success: #2f7f62;
+      --color-success-soft: #e9f6ef;
+      --color-danger: #b74d53;
+      --color-danger-soft: #fbeff0;
+      --color-warning: #9a7440;
+      --color-warning-soft: #fff6e7;
+      --color-border: #dfe7ef;
+      --color-border-soft: #edf2f6;
+      --radius-sm: 7px;
+      --radius-md: 10px;
+      --shadow-card: 0 1px 2px rgba(24, 38, 55, 0.04), 0 14px 34px rgba(24, 38, 55, 0.07);
+      --shadow-card-hover: 0 2px 4px rgba(24, 38, 55, 0.05), 0 18px 42px rgba(24, 38, 55, 0.11);
+      --shadow-modal: 0 10px 28px rgba(13, 24, 36, 0.16), 0 36px 90px rgba(13, 24, 36, 0.24);
+      --ease-soft: cubic-bezier(0.22, 1, 0.36, 1);
+      --transition: 0.22s var(--ease-soft);
+    }
+
+    body {
+      background:
+        radial-gradient(circle at 18% 0%, rgba(45, 120, 168, 0.10), transparent 32%),
+        radial-gradient(circle at 88% 18%, rgba(47, 127, 98, 0.08), transparent 30%),
+        linear-gradient(180deg, #f8fbfd 0%, var(--color-bg) 42%, #eef3f8 100%);
+    }
+
+    .sidebar {
+      background:
+        linear-gradient(180deg, #22364a 0%, #263b50 48%, #223548 100%);
+      box-shadow: 10px 0 32px rgba(18, 32, 48, 0.10);
+    }
+
+    .brand {
+      background: rgba(16, 31, 47, 0.52);
+      backdrop-filter: blur(10px);
+    }
+
+    .brand-mark {
+      background: linear-gradient(135deg, #f5d980, #edc65a);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.42), 0 10px 24px rgba(237, 198, 90, 0.18);
+    }
+
+    .nav-item {
+      border: 1px solid transparent;
+    }
+
+    .nav-item:hover {
+      background: rgba(255, 255, 255, 0.07);
+      border-color: rgba(255, 255, 255, 0.08);
+    }
+
+    .nav-item.active {
+      background: linear-gradient(135deg, rgba(45, 120, 168, 0.98), rgba(63, 143, 188, 0.92));
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 10px 22px rgba(15, 75, 115, 0.18);
+    }
+
+    .badge {
+      background: rgba(229, 237, 244, 0.92);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.50);
+    }
+
+    .main {
+      padding-top: 30px;
+    }
+
+    .page {
+      gap: 18px;
+    }
+
+    .page-header {
+      min-height: 74px;
+      padding: 2px 2px 4px;
+    }
+
+    .eyebrow {
+      width: fit-content;
+      padding: 4px 9px;
+      border-radius: 999px;
+      color: var(--color-primary-hover);
+      background: rgba(237, 246, 251, 0.82);
+      box-shadow: inset 0 0 0 1px rgba(45, 120, 168, 0.10);
+    }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 900;
+    }
+
+    .card {
+      position: relative;
+      overflow: hidden;
+      border-color: rgba(223, 231, 239, 0.86);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(252, 254, 255, 0.96));
+      box-shadow: var(--shadow-card);
+    }
+
+    .card::before {
+      content: "";
+      position: absolute;
+      inset: 0 0 auto;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.95), transparent);
+    }
+
+    .filter-card {
+      padding: 18px;
+      backdrop-filter: blur(14px);
+    }
+
+    .filter-bar {
+      gap: 14px;
+    }
+
+    .field {
+      gap: 8px;
+    }
+
+    label {
+      color: #52677c;
+      font-size: 12px;
+      letter-spacing: 0;
+    }
+
+    input,
+    select {
+      border-color: #d8e2eb;
+      background:
+        linear-gradient(180deg, #ffffff, #fbfdfe);
+      box-shadow: inset 0 1px 2px rgba(24, 38, 55, 0.035);
+      transition:
+        border-color var(--transition),
+        box-shadow var(--transition),
+        background var(--transition),
+        transform var(--transition);
+    }
+
+    input:hover,
+    select:hover {
+      border-color: #c7d7e4;
+      background: #ffffff;
+    }
+
+    input:focus,
+    select:focus {
+      border-color: rgba(45, 120, 168, 0.72);
+      box-shadow: 0 0 0 4px rgba(45, 120, 168, 0.10), inset 0 1px 2px rgba(24, 38, 55, 0.03);
+    }
+
+    .btn {
+      background: linear-gradient(135deg, var(--color-primary), #3f8fbc);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 8px 18px rgba(45, 120, 168, 0.15);
+      transition:
+        transform var(--transition),
+        box-shadow var(--transition),
+        background var(--transition),
+        border-color var(--transition);
+    }
+
+    .btn:hover:not(:disabled) {
+      background: linear-gradient(135deg, var(--color-primary-hover), #357ea9);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 12px 24px rgba(45, 120, 168, 0.22);
+    }
+
+    .btn:active:not(:disabled) {
+      transform: translateY(0);
+      box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.12);
+    }
+
+    .btn.ghost {
+      background: rgba(255, 255, 255, 0.82);
+      box-shadow: 0 6px 16px rgba(24, 38, 55, 0.05);
+    }
+
+    .btn.ghost:hover:not(:disabled) {
+      border-color: #cbd9e5;
+      background: #ffffff;
+    }
+
+    .btn.danger {
+      background: linear-gradient(135deg, var(--color-danger-soft), #fff7f8);
+      box-shadow: inset 0 0 0 1px rgba(183, 77, 83, 0.08);
+    }
+
+    .btn.danger:hover:not(:disabled) {
+      color: #a43d44;
+      background: #fff1f2;
+      box-shadow: 0 10px 22px rgba(183, 77, 83, 0.12);
+    }
+
+    .table-head,
+    .pagination {
+      background: rgba(255, 255, 255, 0.74);
+      backdrop-filter: blur(10px);
+    }
+
+    .section-title {
+      color: #25597a;
+    }
+
+    table {
+      border-spacing: 0;
+    }
+
+    th {
+      color: #65778a;
+      background: linear-gradient(180deg, #fbfdfe, #f6f9fb);
+      box-shadow: inset 0 -1px 0 var(--color-border-soft);
+    }
+
+    td {
+      transition: color var(--transition);
+    }
+
+    tbody tr {
+      transition: background var(--transition), box-shadow var(--transition), transform var(--transition);
+    }
+
+    tbody tr:hover {
+      background: linear-gradient(90deg, rgba(237, 246, 251, 0.72), rgba(255, 255, 255, 0.96));
+      box-shadow: inset 3px 0 0 rgba(45, 120, 168, 0.34);
+    }
+
+    tbody tr:hover .text-cell {
+      color: #173f59;
+    }
+
+    .text-cell {
+      transition: color var(--transition);
+    }
+
+    .tag {
+      border: 1px solid transparent;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.60);
+      transition: transform var(--transition), box-shadow var(--transition);
+    }
+
+    .tag.true,
+    .tag.supported,
+    .tag.success {
+      border-color: rgba(47, 127, 98, 0.10);
+    }
+
+    .tag.false,
+    .tag.not_supported,
+    .tag.failed {
+      border-color: rgba(183, 77, 83, 0.10);
+    }
+
+    .tag.neutral,
+    .tag.pending,
+    .tag.running {
+      border-color: rgba(154, 116, 64, 0.10);
+    }
+
+    .risk-dot {
+      box-shadow: 0 0 0 4px rgba(154, 116, 64, 0.10);
+    }
+
+    .risk.low .risk-dot {
+      box-shadow: 0 0 0 4px rgba(47, 127, 98, 0.10);
+    }
+
+    .risk.high .risk-dot {
+      box-shadow: 0 0 0 4px rgba(183, 77, 83, 0.10);
+    }
+
+    .empty {
+      background:
+        radial-gradient(circle at 50% 28%, rgba(45, 120, 168, 0.08), transparent 34%),
+        linear-gradient(180deg, #fbfdfe, #f7fafc);
+    }
+
+    .empty-icon {
+      color: #2d78a8;
+      background: linear-gradient(135deg, #edf6fb, #ffffff);
+      box-shadow: inset 0 0 0 1px rgba(45, 120, 168, 0.10), 0 12px 26px rgba(45, 120, 168, 0.10);
+    }
+
+    .skeleton-line {
+      background:
+        linear-gradient(90deg, #eef4f8 0%, #ffffff 44%, #eef4f8 88%);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+    }
+
+    .modal {
+      background:
+        radial-gradient(circle at 50% 28%, rgba(45, 120, 168, 0.18), transparent 34%),
+        rgba(15, 27, 40, 0.42);
+      backdrop-filter: blur(8px);
+    }
+
+    .dialog {
+      border: 1px solid rgba(255, 255, 255, 0.68);
+      background: rgba(255, 255, 255, 0.98);
+      box-shadow: var(--shadow-modal);
+    }
+
+    .dialog-head {
+      background:
+        linear-gradient(180deg, #ffffff, #fbfdfe);
+    }
+
+    .dialog-body {
+      background:
+        linear-gradient(180deg, #f8fbfd, #f3f7fa);
+    }
+
+    .detail-block {
+      background:
+        linear-gradient(180deg, #ffffff, #fcfdfe);
+      box-shadow: 0 1px 2px rgba(24, 38, 55, 0.035), 0 10px 26px rgba(24, 38, 55, 0.055);
+      transition: box-shadow var(--transition), transform var(--transition);
+    }
+
+    .detail-block:hover {
+      box-shadow: var(--shadow-card-hover);
+    }
+
+    .result-card {
+      background:
+        linear-gradient(135deg, rgba(35, 78, 108, 0.98), rgba(45, 120, 168, 0.96));
+      box-shadow: 0 16px 38px rgba(45, 120, 168, 0.18);
+    }
+
+    .metric {
+      background:
+        linear-gradient(180deg, #ffffff, #fbfdfe);
+      box-shadow: 0 10px 24px rgba(24, 38, 55, 0.055);
+    }
+
+    .claim,
+    .evidence {
+      background:
+        linear-gradient(180deg, #ffffff, #fcfdfe);
+      box-shadow: 0 8px 20px rgba(24, 38, 55, 0.045);
+      transition: border-color var(--transition), box-shadow var(--transition), transform var(--transition);
+    }
+
+    .claim:hover,
+    .evidence:hover {
+      transform: translateY(-1px);
+      border-color: #c9dce9;
+      box-shadow: 0 14px 30px rgba(24, 38, 55, 0.08);
+    }
+
+    .toast {
+      background: rgba(31, 41, 55, 0.94);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 16px 42px rgba(18, 28, 40, 0.20);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">SG</div>
+        <div>
+          <div class="brand-name">SentiGuard</div>
+          <div class="brand-desc">舆情监测与事实核查平台</div>
+        </div>
+      </div>
+
+      <div class="nav-block">
+        <div class="nav-title">事实核查</div>
+        <a class="nav-item" href="/">
+          <span>✓</span><span>核查工作台</span><span class="badge">提交</span>
+        </a>
+        <a class="nav-item active" href="/history.html">
+          <span>▤</span><span>核查历史</span><span class="badge live">在线</span>
+        </a>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="page">
+        <header class="page-header">
+          <div class="title-group">
+            <div class="eyebrow">事实核查</div>
+            <h1>核查历史</h1>
+          </div>
+          <div class="toolbar">
+            <a class="btn ghost" href="/">返回核查</a>
+            <button id="refreshBtn" class="btn" type="button">刷新</button>
+          </div>
+        </header>
+
+        <section class="card filter-card">
+          <div class="filter-bar">
+            <div class="field keyword">
+              <label for="keyword">关键词</label>
+              <input id="keyword" placeholder="输入核查内容或结论关键词">
+            </div>
+            <div class="field">
+              <label for="resultFilter">结论</label>
+              <select id="resultFilter">
+                <option value="">全部结论</option>
+                <option value="true">真实</option>
+                <option value="false">不支持</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="statusFilter">状态</label>
+              <select id="statusFilter">
+                <option value="">全部状态</option>
+                <option value="success">已完成</option>
+                <option value="running">核查中</option>
+                <option value="failed">核查失败</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="startDate">开始日期</label>
+              <input id="startDate" type="date">
+            </div>
+            <div class="field">
+              <label for="endDate">结束日期</label>
+              <input id="endDate" type="date">
+            </div>
+            <button id="resetBtn" class="btn ghost" type="button">重置</button>
+          </div>
+        </section>
+
+        <section class="card table-card">
+          <div class="table-head">
+            <div>
+              <div class="section-title">历史记录</div>
+              <div id="listSub" class="section-sub">等待加载</div>
+            </div>
+          </div>
+          <div id="tableContainer" class="table-wrap"></div>
+          <div class="pagination">
+            <div id="pageInfo" class="muted">第 1 / 1 页</div>
+            <div id="pageNumberBtns" class="page-number-list"></div>
+            <div class="page-buttons">
+              <button id="prevPageBtn" class="btn ghost" type="button">上一页</button>
+              <button id="nextPageBtn" class="btn ghost" type="button">下一页</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <div id="detailModal" class="modal" aria-hidden="true">
+    <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="dialogTitle">
+      <div class="dialog-head">
+        <div>
+          <h2 id="dialogTitle" class="dialog-title">核查详情</h2>
+          <div id="dialogSub" class="dialog-sub">请选择一条核查记录</div>
+        </div>
+        <button id="closeModalBtn" class="btn ghost icon" type="button" aria-label="关闭">×</button>
+      </div>
+      <div id="detailBody" class="dialog-body"></div>
+    </section>
+  </div>
+
+  <div id="confirmModal" class="modal" aria-hidden="true">
+    <section class="dialog confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+      <div class="dialog-head">
+        <div>
+          <h2 id="confirmTitle" class="dialog-title">删除核查记录</h2>
+          <div id="confirmSub" class="dialog-sub">删除后该记录将不再出现在历史列表中。</div>
+        </div>
+        <button id="confirmCloseBtn" class="btn ghost icon" type="button" aria-label="关闭">×</button>
+      </div>
+      <div id="confirmBody" class="dialog-body">
+        <div class="detail-text">确定删除这条核查记录吗？</div>
+      </div>
+      <div class="dialog-foot">
+        <button id="confirmCancelBtn" class="btn ghost" type="button">取消</button>
+        <button id="confirmOkBtn" class="btn danger" type="button">确认删除</button>
+      </div>
+    </section>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+    const el = {
+      refreshBtn: document.getElementById('refreshBtn'),
+      resetBtn: document.getElementById('resetBtn'),
+      keyword: document.getElementById('keyword'),
+      resultFilter: document.getElementById('resultFilter'),
+      statusFilter: document.getElementById('statusFilter'),
+      startDate: document.getElementById('startDate'),
+      endDate: document.getElementById('endDate'),
+      listSub: document.getElementById('listSub'),
+      tableContainer: document.getElementById('tableContainer'),
+      pageInfo: document.getElementById('pageInfo'),
+      pageNumberBtns: document.getElementById('pageNumberBtns'),
+      prevPageBtn: document.getElementById('prevPageBtn'),
+      nextPageBtn: document.getElementById('nextPageBtn'),
+      detailModal: document.getElementById('detailModal'),
+      dialogSub: document.getElementById('dialogSub'),
+      detailBody: document.getElementById('detailBody'),
+      closeModalBtn: document.getElementById('closeModalBtn'),
+      confirmModal: document.getElementById('confirmModal'),
+      confirmSub: document.getElementById('confirmSub'),
+      confirmBody: document.getElementById('confirmBody'),
+      confirmCloseBtn: document.getElementById('confirmCloseBtn'),
+      confirmCancelBtn: document.getElementById('confirmCancelBtn'),
+      confirmOkBtn: document.getElementById('confirmOkBtn'),
+      toast: document.getElementById('toast')
+    };
+
+    let histories = [];
+    let pageNum = 1;
+    let pageSize = 10;
+    let total = 0;
+    let pages = 1;
+    let filterTimer = null;
+    let rerunningTaskId = null;
+    let pendingDeleteTaskId = null;
+    let currentDetail = null;
+
+    async function requestJson(url, options = {}) {
+      const response = await fetch(url, {
+        headers: { 'Content-Type': 'application/json' },
+        ...options
+      });
+      const body = await response.json();
+      if (!response.ok || (body.code && body.code >= 400)) {
+        throw new Error(body.message || '请求失败');
+      }
+      return Object.prototype.hasOwnProperty.call(body, 'data') ? body.data : body;
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function showToast(message, type = 'info') {
+      el.toast.textContent = message;
+      el.toast.className = `toast show ${type === 'error' ? 'error' : ''}`;
+      setTimeout(() => { el.toast.className = 'toast'; }, 2400);
+    }
+
+    function formatTime(value) {
+      if (!value) return '-';
+      return String(value).replace('T', ' ').slice(0, 19);
+    }
+
+    function labelText(value, fallback) {
+      if (fallback) return fallback;
+      if (value === 'true' || value === 'supported') return '真实';
+      if (value === 'false' || value === 'not_supported') return '不支持';
+      if (value === 'success') return '已完成';
+      if (value === 'running') return '核查中';
+      if (value === 'failed') return '核查失败';
+      return value || '未知';
+    }
+
+    function labelClass(value) {
+      return value || 'neutral';
+    }
+
+    function relationText(value) {
+      if (value === 'support') return '支持';
+      if (value === 'attack') return '反驳';
+      return '中立';
+    }
+
+    function tendencyLevel(item) {
+      const attack = Number(item.attackCount || 0);
+      const label = item.resultLabel;
+      if (label === 'false' || label === 'not_supported' || attack >= 2) return { className: 'high', text: '不支持' };
+      if (label === 'true' || label === 'supported') return { className: 'low', text: '支持' };
+      return { className: 'medium', text: '待判断' };
+    }
+
+    function renderSkeleton() {
+      el.tableContainer.innerHTML = `
+        <div class="skeleton-table">
+          <div class="skeleton-line"></div>
+          <div class="skeleton-line"></div>
+          <div class="skeleton-line"></div>
+          <div class="skeleton-line"></div>
+        </div>
+      `;
+    }
+
+    async function loadHistory() {
+      try {
+        renderSkeleton();
+        const params = new URLSearchParams();
+        params.set('pageNum', pageNum);
+        params.set('pageSize', pageSize);
+        if (el.keyword.value.trim()) params.set('keyword', el.keyword.value.trim());
+        if (el.resultFilter.value) params.set('resultLabel', el.resultFilter.value);
+        if (el.statusFilter.value) params.set('taskStatus', el.statusFilter.value);
+        if (el.startDate.value) params.set('startTime', `${el.startDate.value} 00:00:00`);
+        if (el.endDate.value) params.set('endTime', `${el.endDate.value} 23:59:59`);
+
+        const page = await requestJson(`/api/fact-check/history?${params.toString()}`);
+        histories = page.records || [];
+        total = page.total || 0;
+        pageNum = page.pageNum || pageNum;
+        pageSize = page.pageSize || pageSize;
+        pages = page.pages || 1;
+        renderTable();
+      } catch (error) {
+        showToast(error.message, 'error');
+        renderEmpty('记录加载失败');
+      }
+    }
+
+    function renderEmpty(text = '没有符合条件的核查记录') {
+      el.tableContainer.innerHTML = `
+        <div class="empty">
+          <div class="empty-box">
+            <div class="empty-icon">∅</div>
+            <div>${escapeHtml(text)}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderTable() {
+      el.listSub.textContent = `共 ${total} 条记录`;
+      renderPagination();
+
+      if (!histories.length) {
+        renderEmpty();
+        return;
+      }
+
+      el.tableContainer.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>任务编号</th>
+              <th>核查内容</th>
+              <th>结论</th>
+              <th>状态</th>
+              <th>核查倾向</th>
+              <th>证据</th>
+              <th>提交时间</th>
+              <th>完成时间</th>
+              <th style="text-align:right;">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${histories.map(item => {
+              const tendency = tendencyLevel(item);
+              return `
+                <tr>
+                  <td><strong>#${escapeHtml(item.taskId)}</strong></td>
+                  <td><div class="text-cell" title="${escapeHtml(item.inputText || '-')}">${escapeHtml(item.inputText || '-')}</div></td>
+                  <td><span class="tag ${labelClass(item.resultLabel)}">${escapeHtml(labelText(item.resultLabel, item.resultLabelText))}</span></td>
+                  <td><span class="tag ${labelClass(item.status)}">${escapeHtml(labelText(item.status))}</span></td>
+                  <td><span class="risk ${tendency.className}"><span class="risk-dot"></span>${escapeHtml(tendency.text)}</span></td>
+                  <td>${escapeHtml(item.evidenceCount ?? 0)}</td>
+                  <td class="muted">${escapeHtml(formatTime(item.submitTime))}</td>
+                  <td class="muted">${escapeHtml(formatTime(item.finishTime))}</td>
+                  <td>
+                    <div class="row-actions">
+                      <button class="btn ghost view-btn" type="button" data-task-id="${escapeHtml(item.taskId)}">详情</button>
+                    </div>
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      `;
+
+      el.tableContainer.querySelectorAll('.view-btn').forEach(btn => {
+        btn.addEventListener('click', () => openDetail(Number(btn.dataset.taskId)));
+      });
+    }
+
+    function renderPagination() {
+      const safePages = Math.max(1, pages || 1);
+      el.pageInfo.textContent = `第 ${pageNum} / ${safePages} 页 · 共 ${total} 条`;
+      el.prevPageBtn.disabled = pageNum <= 1;
+      el.nextPageBtn.disabled = pageNum >= safePages;
+
+      const nums = [];
+      const start = Math.max(1, pageNum - 2);
+      const end = Math.min(safePages, pageNum + 2);
+      if (start > 1) nums.push(1);
+      if (start > 2) nums.push('...');
+      for (let i = start; i <= end; i++) nums.push(i);
+      if (end < safePages - 1) nums.push('...');
+      if (end < safePages) nums.push(safePages);
+
+      el.pageNumberBtns.innerHTML = nums.map(item => {
+        if (item === '...') return '<span class="muted">...</span>';
+        return `<button class="page-number ${item === pageNum ? 'active' : ''}" type="button" data-page="${item}">${item}</button>`;
+      }).join('');
+
+      el.pageNumberBtns.querySelectorAll('.page-number').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const next = Number(btn.dataset.page);
+          if (next !== pageNum) {
+            pageNum = next;
+            loadHistory();
+          }
+        });
+      });
+    }
+
+    function openModal() {
+      el.detailModal.classList.add('show');
+      el.detailModal.setAttribute('aria-hidden', 'false');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeModal() {
+      el.detailModal.classList.remove('show');
+      el.detailModal.setAttribute('aria-hidden', 'true');
+      currentDetail = null;
+      if (!el.confirmModal.classList.contains('show')) {
+        document.body.style.overflow = '';
+      }
+    }
+
+    async function openDetail(taskId) {
+      openModal();
+      el.dialogSub.textContent = `任务 #${taskId} · 正在加载详情`;
+      el.detailBody.innerHTML = `
+        <div class="skeleton-table">
+          <div class="skeleton-line"></div>
+          <div class="skeleton-line"></div>
+          <div class="skeleton-line"></div>
+        </div>
+      `;
+
+      try {
+        const detail = await requestJson(`/api/fact-check/tasks/${taskId}`);
+        renderDetail(detail);
+      } catch (error) {
+        showToast(error.message, 'error');
+        el.detailBody.innerHTML = '<div class="empty">详情加载失败。</div>';
+      }
+    }
+
+    function renderDetail(detail) {
+      currentDetail = detail;
+      const result = detail.result || {};
+      const claims = detail.claims || [];
+      const evidences = detail.evidences || [];
+      const report = detail.report || {};
+
+      el.dialogSub.textContent = `任务 #${detail.taskId || '-'} · ${formatTime(detail.finishTime || detail.submitTime)}`;
+      el.detailBody.innerHTML = `
+        <div class="detail-grid">
+          <div class="detail-main">
+            <div class="detail-block result-card">
+              <div class="detail-title">核查结论</div>
+              <div class="result-title">${escapeHtml(result.conclusion || '暂无结论')}</div>
+              <div class="detail-text">${escapeHtml(result.analysisDetail || '暂无详细分析说明。')}</div>
+            </div>
+
+            <div class="detail-block">
+              <div class="detail-title">核查内容</div>
+              <div class="detail-text">${escapeHtml(detail.inputText || '-')}</div>
+            </div>
+
+            <div class="detail-block">
+              <div class="detail-title">声明拆解</div>
+              ${claims.length ? claims.map((claim, index) => `
+                <div class="claim">
+                  <strong>${escapeHtml(index + 1)}. ${escapeHtml(claim.claimText || '-')}</strong>
+                  <div class="muted">${escapeHtml(claim.claimType || '未分类')}</div>
+                </div>
+              `).join('') : '<div class="muted">暂无声明拆解。</div>'}
+            </div>
+
+            <div class="detail-block">
+              <div class="detail-title">证据材料</div>
+              ${evidences.length ? evidences.map(evidence => `
+                <div class="evidence">
+                  <div class="evidence-head">
+                    <strong>${escapeHtml(evidence.title || '未命名证据')}</strong>
+                    <span class="tag ${labelClass(evidence.relationType)}">${escapeHtml(relationText(evidence.relationType))}</span>
+                  </div>
+                  <div class="detail-text">${escapeHtml(evidence.content || '')}</div>
+                  <div class="muted">${escapeHtml(evidence.sourceName || '未知来源')} · ${escapeHtml(evidence.evidenceType || '证据')}</div>
+                </div>
+              `).join('') : '<div class="muted">暂无证据材料。</div>'}
+            </div>
+
+            <div class="detail-block">
+              <div class="detail-title">核查报告</div>
+              <div class="detail-text">${escapeHtml(report.content || '暂无报告内容')}</div>
+            </div>
+          </div>
+
+          <aside class="detail-aside">
+            <div class="detail-block">
+              <div class="detail-title">结果标记</div>
+              <span class="tag ${labelClass(result.label || detail.status)}">${escapeHtml(labelText(result.label, result.labelText))}</span>
+            </div>
+            <div class="metric-grid">
+              <div class="metric">
+                <div class="metric-value">${escapeHtml(result.supportCount ?? 0)}</div>
+                <div class="metric-label">支持证据</div>
+              </div>
+              <div class="metric">
+                <div class="metric-value">${escapeHtml(result.attackCount ?? 0)}</div>
+                <div class="metric-label">反驳证据</div>
+              </div>
+            </div>
+            <button id="modalRerunBtn" class="btn" type="button">重新核查</button>
+            <button id="copyConclusionBtn" class="btn ghost" type="button">复制结论</button>
+            <button id="exportReportBtn" class="btn ghost" type="button">导出报告</button>
+            <button id="modalDeleteBtn" class="btn danger" type="button">删除记录</button>
+          </aside>
+        </div>
+      `;
+
+      document.getElementById('modalRerunBtn').addEventListener('click', () => rerunTask(detail.taskId));
+      document.getElementById('modalDeleteBtn').addEventListener('click', () => askDeleteTask(detail.taskId));
+      document.getElementById('copyConclusionBtn').addEventListener('click', copyConclusion);
+      document.getElementById('exportReportBtn').addEventListener('click', exportReport);
+    }
+
+    async function rerunTask(taskId) {
+      if (rerunningTaskId) return;
+      try {
+        rerunningTaskId = Number(taskId);
+        renderTable();
+        const detail = await requestJson(`/api/fact-check/tasks/${taskId}/rerun`, { method: 'POST' });
+        closeModal();
+        pageNum = 1;
+        await loadHistory();
+        showToast(`已生成新的核查记录 #${detail.taskId}`);
+      } catch (error) {
+        showToast(error.message, 'error');
+      } finally {
+        rerunningTaskId = null;
+        renderTable();
+      }
+    }
+
+    function askDeleteTask(taskId) {
+      pendingDeleteTaskId = Number(taskId);
+      el.confirmSub.textContent = `任务 #${taskId}`;
+      el.confirmBody.innerHTML = '<div class="detail-text">删除后该核查记录将从历史列表中移除。该操作用于清理无效或重复记录，请确认后继续。</div>';
+      el.confirmModal.classList.add('show');
+      el.confirmModal.setAttribute('aria-hidden', 'false');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeConfirmModal() {
+      pendingDeleteTaskId = null;
+      el.confirmModal.classList.remove('show');
+      el.confirmModal.setAttribute('aria-hidden', 'true');
+      if (!el.detailModal.classList.contains('show')) {
+        document.body.style.overflow = '';
+      }
+    }
+
+    async function performDeleteTask() {
+      if (!pendingDeleteTaskId) return;
+      try {
+        const taskId = pendingDeleteTaskId;
+        el.confirmOkBtn.disabled = true;
+        el.confirmOkBtn.textContent = '删除中';
+        await requestJson(`/api/fact-check/tasks/${taskId}`, { method: 'DELETE' });
+        closeConfirmModal();
+        closeModal();
+        await loadHistory();
+        showToast('核查历史已删除');
+      } catch (error) {
+        showToast(error.message, 'error');
+      } finally {
+        el.confirmOkBtn.disabled = false;
+        el.confirmOkBtn.textContent = '确认删除';
+      }
+    }
+
+    async function copyConclusion() {
+      if (!currentDetail) return;
+      const result = currentDetail.result || {};
+      const text = [
+        `任务编号：#${currentDetail.taskId || '-'}`,
+        `核查结论：${result.conclusion || '暂无结论'}`,
+        `分析说明：${result.analysisDetail || '暂无详细分析说明'}`
+      ].join('\n');
+
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(text);
+        } else {
+          const textarea = document.createElement('textarea');
+          textarea.value = text;
+          textarea.style.position = 'fixed';
+          textarea.style.left = '-9999px';
+          document.body.appendChild(textarea);
+          textarea.select();
+          document.execCommand('copy');
+          textarea.remove();
+        }
+        showToast('结论已复制');
+      } catch (error) {
+        showToast('复制失败，请手动选择内容', 'error');
+      }
+    }
+
+    function exportReport() {
+      if (!currentDetail) return;
+      const result = currentDetail.result || {};
+      const report = currentDetail.report || {};
+      const content = [
+        'SentiGuard 核查报告',
+        `任务编号：#${currentDetail.taskId || '-'}`,
+        `提交时间：${formatTime(currentDetail.submitTime)}`,
+        `完成时间：${formatTime(currentDetail.finishTime)}`,
+        '',
+        '核查内容：',
+        currentDetail.inputText || '-',
+        '',
+        '核查结论：',
+        result.conclusion || '暂无结论',
+        '',
+        '分析说明：',
+        result.analysisDetail || '暂无详细分析说明',
+        '',
+        '报告内容：',
+        report.content || '暂无报告内容'
+      ].join('\n');
+
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `sentiguard-report-${currentDetail.taskId || 'detail'}.txt`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      showToast('报告已导出');
+    }
+
+    function scheduleLoad() {
+      window.clearTimeout(filterTimer);
+      filterTimer = window.setTimeout(() => {
+        pageNum = 1;
+        loadHistory();
+      }, 260);
+    }
+
+    [el.keyword, el.resultFilter, el.statusFilter, el.startDate, el.endDate].forEach(item => {
+      item.addEventListener('input', scheduleLoad);
+      item.addEventListener('change', () => {
+        window.clearTimeout(filterTimer);
+        pageNum = 1;
+        loadHistory();
+      });
+    });
+
+    el.resetBtn.addEventListener('click', () => {
+      window.clearTimeout(filterTimer);
+      el.keyword.value = '';
+      el.resultFilter.value = '';
+      el.statusFilter.value = '';
+      el.startDate.value = '';
+      el.endDate.value = '';
+      pageNum = 1;
+      loadHistory();
+    });
+
+    el.prevPageBtn.addEventListener('click', () => {
+      if (pageNum > 1) {
+        pageNum--;
+        loadHistory();
+      }
+    });
+
+    el.nextPageBtn.addEventListener('click', () => {
+      if (pageNum < pages) {
+        pageNum++;
+        loadHistory();
+      }
+    });
+
+    el.refreshBtn.addEventListener('click', loadHistory);
+    el.closeModalBtn.addEventListener('click', closeModal);
+    el.confirmCloseBtn.addEventListener('click', closeConfirmModal);
+    el.confirmCancelBtn.addEventListener('click', closeConfirmModal);
+    el.confirmOkBtn.addEventListener('click', performDeleteTask);
+    el.detailModal.addEventListener('click', event => {
+      if (event.target === el.detailModal) closeModal();
+    });
+    el.confirmModal.addEventListener('click', event => {
+      if (event.target === el.confirmModal) closeConfirmModal();
+    });
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape') {
+        if (el.confirmModal.classList.contains('show')) closeConfirmModal();
+        else closeModal();
+      }
+    });
+
+    loadHistory();
+  </script>
+</body>
+</html>

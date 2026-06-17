@@ -27,4 +27,12 @@ public class HistoryVO {
     private BigDecimal confidenceScore;
 
     private String conclusion;
+
+    private Integer supportCount;
+
+    private Integer attackCount;
+
+    private Long evidenceCount;
+
+    private Boolean hasReport;
 }

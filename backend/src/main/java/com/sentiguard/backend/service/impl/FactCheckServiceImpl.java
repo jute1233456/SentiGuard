@@ -12,11 +12,13 @@ import org.springframework.util.StringUtils;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.sentiguard.backend.common.PageResult;
 import com.sentiguard.backend.agent.AgentCheckRequest;
 import com.sentiguard.backend.agent.AgentCheckResponse;
 import com.sentiguard.backend.agent.AgentClaim;
 import com.sentiguard.backend.agent.AgentEvidence;
 import com.sentiguard.backend.dto.FactCheckAnalyzeDTO;
+import com.sentiguard.backend.dto.HistoryQueryDTO;
 import com.sentiguard.backend.entity.AnalysisReport;
 import com.sentiguard.backend.entity.Evidence;
 import com.sentiguard.backend.entity.FactCheckResult;
@@ -141,15 +143,14 @@ public class FactCheckServiceImpl implements FactCheckService {
     }
 
     @Override
-    public List<HistoryVO> getHistory(Long userId) {
-        LambdaQueryWrapper<FactCheckTask> wrapper = new LambdaQueryWrapper<FactCheckTask>()
-                .orderByDesc(FactCheckTask::getSubmitTime)
-                .last("LIMIT 50");
-        if (userId != null) {
-            wrapper.eq(FactCheckTask::getUserId, userId);
-        }
-
-        List<FactCheckTask> tasks = taskMapper.selectList(wrapper);
+    public PageResult<HistoryVO> getHistory(HistoryQueryDTO query) {
+        HistoryQueryDTO safeQuery = normalizeHistoryQuery(query);
+        long total = taskMapper.selectCount(buildHistoryWrapper(safeQuery));
+        long offset = (long) (safeQuery.getPageNum() - 1) * safeQuery.getPageSize();
+        QueryWrapper<FactCheckTask> pageWrapper = buildHistoryWrapper(safeQuery)
+                .orderByDesc("submit_time")
+                .last("LIMIT " + offset + ", " + safeQuery.getPageSize());
+        List<FactCheckTask> tasks = taskMapper.selectList(pageWrapper);
         List<HistoryVO> history = new ArrayList<>();
         for (FactCheckTask task : tasks) {
             FactCheckResult result = resultMapper.selectOne(new LambdaQueryWrapper<FactCheckResult>()
@@ -166,10 +167,16 @@ public class FactCheckServiceImpl implements FactCheckService {
                 vo.setResultLabelText(labelText(result.getResultLabel()));
                 vo.setConfidenceScore(result.getConfidenceScore());
                 vo.setConclusion(result.getConclusion());
+                vo.setSupportCount(result.getSupportCount());
+                vo.setAttackCount(result.getAttackCount());
             }
+            vo.setEvidenceCount(evidenceMapper.selectCount(new LambdaQueryWrapper<Evidence>()
+                    .eq(Evidence::getTaskId, task.getId())));
+            vo.setHasReport(reportMapper.selectCount(new LambdaQueryWrapper<AnalysisReport>()
+                    .eq(AnalysisReport::getTaskId, task.getId())) > 0);
             history.add(vo);
         }
-        return history;
+        return PageResult.of(total, safeQuery.getPageNum(), safeQuery.getPageSize(), history);
     }
 
     @Override
@@ -180,6 +187,70 @@ public class FactCheckServiceImpl implements FactCheckService {
             throw new IllegalArgumentException("核查报告不存在");
         }
         return toReportVO(report);
+    }
+
+    @Override
+    public FactCheckDetailVO rerun(Long taskId) {
+        FactCheckTask oldTask = taskMapper.selectById(taskId);
+        if (oldTask == null) {
+            throw new IllegalArgumentException("核查任务不存在");
+        }
+        FactCheckAnalyzeDTO dto = new FactCheckAnalyzeDTO();
+        dto.setUserId(oldTask.getUserId());
+        dto.setHotEventId(oldTask.getHotEventId());
+        dto.setInputText(oldTask.getInputText());
+        return analyze(dto);
+    }
+
+    @Override
+    @Transactional
+    public void deleteTask(Long taskId) {
+        FactCheckTask task = taskMapper.selectById(taskId);
+        if (task == null) {
+            throw new IllegalArgumentException("核查任务不存在");
+        }
+        taskMapper.deleteById(taskId);
+        reportMapper.delete(new LambdaQueryWrapper<AnalysisReport>()
+                .eq(AnalysisReport::getTaskId, taskId));
+    }
+
+    private HistoryQueryDTO normalizeHistoryQuery(HistoryQueryDTO query) {
+        HistoryQueryDTO safeQuery = query == null ? new HistoryQueryDTO() : query;
+        int pageNum = safeQuery.getPageNum() == null || safeQuery.getPageNum() < 1 ? 1 : safeQuery.getPageNum();
+        int pageSize = safeQuery.getPageSize() == null || safeQuery.getPageSize() < 1 ? 10 : safeQuery.getPageSize();
+        if (pageSize > 50) {
+            pageSize = 50;
+        }
+        safeQuery.setPageNum(pageNum);
+        safeQuery.setPageSize(pageSize);
+        return safeQuery;
+    }
+
+    private QueryWrapper<FactCheckTask> buildHistoryWrapper(HistoryQueryDTO query) {
+        QueryWrapper<FactCheckTask> wrapper = new QueryWrapper<>();
+        if (query.getUserId() != null) {
+            wrapper.eq("user_id", query.getUserId());
+        }
+        if (StringUtils.hasText(query.getTaskStatus())) {
+            wrapper.eq("task_status", query.getTaskStatus());
+        }
+        if (query.getStartTime() != null) {
+            wrapper.ge("submit_time", query.getStartTime());
+        }
+        if (query.getEndTime() != null) {
+            wrapper.le("submit_time", query.getEndTime());
+        }
+        if (StringUtils.hasText(query.getResultLabel())) {
+            wrapper.apply("exists (select 1 from fact_check_result r where r.task_id = fact_check_task.id and r.result_label = {0})",
+                    query.getResultLabel());
+        }
+        if (StringUtils.hasText(query.getKeyword())) {
+            wrapper.and(item -> item.like("input_text", query.getKeyword())
+                    .or()
+                    .apply("exists (select 1 from fact_check_result r where r.task_id = fact_check_task.id and r.conclusion like concat('%',{0},'%'))",
+                            query.getKeyword()));
+        }
+        return wrapper;
     }
 
     private Map<Integer, Long> saveClaims(Long taskId, List<AgentClaim> claims) {
@@ -322,11 +393,11 @@ public class FactCheckServiceImpl implements FactCheckService {
     }
 
     private String labelText(String label) {
-        if ("true".equals(label)) {
+        if ("true".equals(label) || "supported".equals(label)) {
             return "真实";
         }
-        if ("false".equals(label)) {
-            return "虚假";
+        if ("false".equals(label) || "not_supported".equals(label)) {
+            return "不支持";
         }
         if ("partly_true".equals(label)) {
             return "部分真实";
