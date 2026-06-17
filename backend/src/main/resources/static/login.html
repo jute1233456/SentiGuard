@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SentiGuard - 登录</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: #edf2f6;
+      font-family: "Microsoft YaHei", Arial, sans-serif;
+      color: #172331;
+    }
+    .card {
+      width: 400px;
+      background: #ffffff;
+      border: 1px solid #d7e1ea;
+      border-radius: 10px;
+      box-shadow: 0 18px 38px rgba(21,38,55,0.09);
+      padding: 36px 32px 28px;
+    }
+    .brand {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    .brand-mark {
+      width: 48px; height: 48px;
+      display: inline-grid; place-items: center;
+      border-radius: 8px;
+      background: #f3c84b; color: #102a3b;
+      font-size: 20px; font-weight: 900;
+    }
+    h2 { margin: 10px 0 4px; font-size: 22px; }
+    .sub { color: #647386; font-size: 13px; }
+    .tabs {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 0; margin-bottom: 20px;
+      border-bottom: 2px solid #d7e1ea;
+    }
+    .tab {
+      padding: 10px; text-align: center;
+      font-weight: 900; font-size: 14px;
+      background: none; border: 0; cursor: pointer;
+      color: #647386;
+    }
+    .tab.active {
+      color: #1f78b5;
+      border-bottom: 2px solid #1f78b5;
+      margin-bottom: -2px;
+    }
+    .form { display: grid; gap: 14px; }
+    .form.hidden { display: none; }
+    .field { display: grid; gap: 6px; }
+    label { font-size: 13px; font-weight: 900; color: #3f5367; }
+    input {
+      width: 100%; height: 40px;
+      border: 1px solid #ccd8e4; border-radius: 6px;
+      padding: 0 12px; font: inherit; outline: none;
+    }
+    input:focus {
+      border-color: #1f78b5;
+      box-shadow: 0 0 0 3px rgba(31,120,181,0.12);
+    }
+    .btn {
+      width: 100%; height: 40px; margin-top: 4px;
+      border: 0; border-radius: 6px;
+      background: #1f78b5; color: #ffffff;
+      font-weight: 900; cursor: pointer;
+    }
+    .btn:disabled { opacity: 0.66; cursor: wait; }
+    .toast {
+      position: fixed; right: 24px; bottom: 24px;
+      max-width: 360px; padding: 12px 16px;
+      border-radius: 8px; color: #ffffff;
+      background: #1f2937; font-size: 14px;
+      box-shadow: 0 18px 38px rgba(21,38,55,0.15);
+      opacity: 0; transform: translateY(10px);
+      transition: 0.2s; z-index: 30;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.error { background: #c93a3a; }
+    .toast.success { background: #158147; }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <div class="brand">
+    <div class="brand-mark">SG</div>
+    <h2>SentiGuard</h2>
+    <div class="sub">舆情监测与事实核查平台</div>
+  </div>
+
+  <div class="tabs">
+    <button id="tabLogin" class="tab active" type="button">登录</button>
+    <button id="tabRegister" class="tab" type="button">注册</button>
+  </div>
+
+  <!-- 登录表单 -->
+  <form id="loginForm" class="form">
+    <div class="field">
+      <label for="loginUser">用户名</label>
+      <input id="loginUser" required autocomplete="username" placeholder="请输入用户名">
+    </div>
+    <div class="field">
+      <label for="loginPass">密码</label>
+      <input id="loginPass" type="password" required autocomplete="current-password" placeholder="请输入密码">
+    </div>
+    <button id="loginBtn" class="btn" type="submit">登 录</button>
+  </form>
+
+  <!-- 注册表单 -->
+  <form id="registerForm" class="form hidden">
+    <div class="field">
+      <label for="regUser">用户名</label>
+      <input id="regUser" required autocomplete="username" placeholder="3-32位字母数字组合" minlength="3" maxlength="32">
+    </div>
+    <div class="field">
+      <label for="regNick">昵称（可选）</label>
+      <input id="regNick" placeholder="显示名称">
+    </div>
+    <div class="field">
+      <label for="regPass">密码</label>
+      <input id="regPass" type="password" required autocomplete="new-password" placeholder="至少6位" minlength="6">
+    </div>
+    <button id="registerBtn" class="btn" type="submit">注 册</button>
+  </form>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+  const el = {
+    tabLogin: document.getElementById('tabLogin'),
+    tabRegister: document.getElementById('tabRegister'),
+    loginForm: document.getElementById('loginForm'),
+    registerForm: document.getElementById('registerForm'),
+    loginUser: document.getElementById('loginUser'),
+    loginPass: document.getElementById('loginPass'),
+    regUser: document.getElementById('regUser'),
+    regNick: document.getElementById('regNick'),
+    regPass: document.getElementById('regPass'),
+    loginBtn: document.getElementById('loginBtn'),
+    registerBtn: document.getElementById('registerBtn'),
+    toast: document.getElementById('toast'),
+  };
+
+  // 如果已经登录过，直接跳转
+  if (localStorage.getItem('sg_token')) {
+    window.location.href = '/';
+  }
+
+  function showToast(msg, type) {
+    el.toast.textContent = msg;
+    el.toast.className = 'toast show ' + (type || '');
+    setTimeout(function () { el.toast.className = 'toast'; }, 3000);
+  }
+
+  function saveAuth(data) {
+    localStorage.setItem('sg_token', data.token);
+    localStorage.setItem('sg_token_type', data.tokenType);
+    localStorage.setItem('sg_user_id', data.userId);
+    localStorage.setItem('sg_username', data.username);
+    localStorage.setItem('sg_nickname', data.nickname || data.username);
+  }
+
+  async function login(e) {
+    e.preventDefault();
+    el.loginBtn.disabled = true;
+    el.loginBtn.textContent = '登录中...';
+    try {
+      var resp = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: el.loginUser.value.trim(),
+          password: el.loginPass.value
+        })
+      });
+      var data = await resp.json();
+      if (data.code === 200) {
+        saveAuth(data.data);
+        showToast('登录成功，正在跳转...', 'success');
+        setTimeout(function () { window.location.href = '/'; }, 600);
+      } else {
+        showToast(data.message || '登录失败', 'error');
+      }
+    } catch (err) {
+      showToast('网络错误：' + err.message, 'error');
+    } finally {
+      el.loginBtn.disabled = false;
+      el.loginBtn.textContent = '登 录';
+    }
+  }
+
+  async function register(e) {
+    e.preventDefault();
+    el.registerBtn.disabled = true;
+    el.registerBtn.textContent = '注册中...';
+    try {
+      var resp = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: el.regUser.value.trim(),
+          password: el.regPass.value,
+          nickname: el.regNick.value.trim() || undefined
+        })
+      });
+      var data = await resp.json();
+      if (data.code === 200) {
+        saveAuth(data.data);
+        showToast('注册成功，正在跳转...', 'success');
+        setTimeout(function () { window.location.href = '/'; }, 600);
+      } else {
+        showToast(data.message || '注册失败', 'error');
+      }
+    } catch (err) {
+      showToast('网络错误：' + err.message, 'error');
+    } finally {
+      el.registerBtn.disabled = false;
+      el.registerBtn.textContent = '注 册';
+    }
+  }
+
+  // Tab 切换
+  el.tabLogin.addEventListener('click', function () {
+    el.tabLogin.classList.add('active');
+    el.tabRegister.classList.remove('active');
+    el.loginForm.classList.remove('hidden');
+    el.registerForm.classList.add('hidden');
+  });
+
+  el.tabRegister.addEventListener('click', function () {
+    el.tabRegister.classList.add('active');
+    el.tabLogin.classList.remove('active');
+    el.registerForm.classList.remove('hidden');
+    el.loginForm.classList.add('hidden');
+  });
+
+  el.loginForm.addEventListener('submit', login);
+  el.registerForm.addEventListener('submit', register);
+</script>
+</body>
+</html>

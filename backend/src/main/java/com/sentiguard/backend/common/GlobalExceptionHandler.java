@@ -1,5 +1,7 @@
 package com.sentiguard.backend.common;
 
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.BindException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -27,6 +29,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     public Result<Void> handleIllegalArgument(IllegalArgumentException ex) {
         return Result.fail(ex.getMessage());
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public Result<Void> handleAccessDenied(AccessDeniedException ex) {
+        return new Result<>(403, "无权限访问", null);
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
+    public Result<Void> handleAuthentication(AuthenticationException ex) {
+        return new Result<>(401, "未登录或Token已过期", null);
     }
 
     @ExceptionHandler(Exception.class)

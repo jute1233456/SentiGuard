@@ -1,0 +1,3 @@
+# Mock Agent profile: 使用 MockAgentService 返回模拟数据，无需 AI 后端
+# 启动方式: --spring.profiles.active=mock-agent
+# 数据库使用 MySQL（与默认配置相同）

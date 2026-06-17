@@ -756,8 +756,10 @@
       <header class="topbar">
         <div class="crumb">平台工作台 / 事实核查</div>
         <div class="system-state">
+          <span id="currentUser" class="pill" style="cursor:default">未登录</span>
           <span id="backendStatus" class="pill">后端检测中</span>
           <span id="dbStatus" class="pill">数据库检测中</span>
+          <button id="logoutBtn" class="btn ghost" type="button" style="min-width:60px;height:32px;font-size:12px;">退出</button>
         </div>
       </header>
 
@@ -883,6 +885,8 @@
       hotEventId: document.getElementById('hotEventId'),
       analyzeBtn: document.getElementById('analyzeBtn'),
       resetBtn: document.getElementById('resetBtn'),
+      currentUser: document.getElementById('currentUser'),
+      logoutBtn: document.getElementById('logoutBtn'),
       resultView: document.getElementById('resultView'),
       claimEvidenceView: document.getElementById('claimEvidenceView'),
       reportView: document.getElementById('reportView'),
@@ -894,16 +898,54 @@
       toast: document.getElementById('toast')
     };
 
-    async function requestJson(url, options = {}) {
-      const response = await fetch(url, {
-        headers: { 'Content-Type': 'application/json' },
-        ...options
+    function getToken() {
+      return localStorage.getItem('sg_token');
+    }
+
+    async function requestJson(url, options) {
+      options = options || {};
+      var token = getToken();
+      var headers = { 'Content-Type': 'application/json' };
+      if (token) { headers['Authorization'] = 'Bearer ' + token; }
+      if (options.headers) {
+        Object.keys(options.headers).forEach(function(k) { headers[k] = options.headers[k]; });
+      }
+      var response = await fetch(url, {
+        headers: headers,
+        method: options.method || 'GET',
+        body: options.body
       });
-      const body = await response.json();
+      var body = await response.json();
       if (!response.ok || (body.code && body.code >= 400)) {
         throw new Error(body.message || '请求失败');
       }
       return Object.prototype.hasOwnProperty.call(body, 'data') ? body.data : body;
+    }
+
+    function checkAuth() {
+      var token = getToken();
+      if (!token) {
+        window.location.href = '/login.html';
+        return false;
+      }
+      try {
+        var payload = JSON.parse(atob(token.split('.')[1]));
+        if (payload.exp * 1000 < Date.now()) {
+          localStorage.clear();
+          window.location.href = '/login.html';
+          return false;
+        }
+      } catch (e) {
+        localStorage.clear();
+        window.location.href = '/login.html';
+        return false;
+      }
+      return true;
+    }
+
+    function logout() {
+      localStorage.clear();
+      window.location.href = '/login.html';
     }
 
     function escapeHtml(value) {
@@ -1095,6 +1137,27 @@
 
     el.form.addEventListener('submit', analyze);
     el.resetBtn.addEventListener('click', resetPage);
+    el.logoutBtn.addEventListener('click', logout);
+
+    if (checkAuth()) {
+      var nickname = localStorage.getItem('sg_nickname') || localStorage.getItem('sg_username') || '用户';
+      el.currentUser.textContent = nickname;
+      el.currentUser.classList.remove('error');
+      loadUserInfo();
+    }
+
+    async function loadUserInfo() {
+      try {
+        var user = await requestJson('/api/auth/me');
+        el.currentUser.textContent = user.nickname || user.username;
+        localStorage.setItem('sg_nickname', user.nickname || user.username);
+      } catch (e) {
+        // token 无效则跳转
+        if (e.message && e.message.indexOf('401') >= 0 || e.message.indexOf('403') >= 0) {
+          logout();
+        }
+      }
+    }
 
     checkBackend();
     checkDatabase();
