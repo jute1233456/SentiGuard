@@ -552,21 +552,94 @@
 
 ---
 
+### 条目 #26 — 事实核查接口从mock改为真实实现
+
+- **日期**：2026-06-17
+- **场景**：代码替换 / 功能完善 / 集成真实业务逻辑
+- **关键 Prompt**：
+  > "行了，事实核查路由要换成真实来了"
+- **AI 产出**：
+  - 移除`fact_check.py`中的mock逻辑和`_mock_verdict`函数
+  - 集成真实的`FactAgent`多智能体系统
+  - 添加`get_fact_agent()`单例管理函数，避免重复初始化
+  - 复用`test_factagent.py`中的`parse_verdict_from_results`解析逻辑
+  - 实现标签映射：`supported → isTrue=True`，`not_supported → isTrue=False`
+- **人工修改**：无
+- **风险控制**：
+  - FactAgent实例全局缓存，避免每次请求重新加载模型
+  - 完善的异常处理和结果解析逻辑
+  - 保留原接口定义不变，向后兼容
+- **价值**：事实核查接口从模拟变成真实可用，完整的多智能体核查流程
+
+---
+
+### 条目 #27 — .gitignore更新与项目清理
+
+- **日期**：2026-06-17
+- **场景**：项目维护 / 版本控制规范
+- **关键 Prompt**：
+  > "行了，提交git测试一下"
+- **AI 产出**：
+  - 检查git status，发现临时测试文件和data目录未跟踪
+  - 更新`.gitignore`，添加：
+    - `data/hot_topic/` - 动态生成的数据目录
+    - `simple_gdelt_test.py` - 临时测试文件
+    - `test_rss.py` - 临时测试文件
+    - `show_rss_news.py` - 临时测试文件
+  - 提交并推送到远程仓库
+- **人工修改**：无
+- **风险控制**：
+  - 不提交敏感配置文件（.env已在.gitignore中）
+  - 不提交大数据文件，避免仓库膨胀
+  - 保留生成代码可复现性
+- **价值**：仓库保持整洁，只包含必要的源代码和文档
+
+---
+
+### 条目 #28 — 豆包API Key优先级优化
+
+- **日期**：2026-06-17
+- **场景**：配置优化 / 环境变量管理 / 向后兼容
+- **关键 Prompt**：
+  > "修改一下，llm中doubao的apikey，如果没有输入就从环境中获得，如果有输入就用输入，然后再env文件中加入豆包apikey的位置，让调用llm的时候先检查env有咩有，有的话就输入env中的apikey"
+- **AI 产出**：
+  - 修改`doubao_client.py`的API Key解析逻辑：
+    - 优先级1：构造函数直接传入的`api_key`参数
+    - 优先级2：环境变量`DOUBAO_API_KEY`
+    - 优先级3：环境变量`ARK_API_KEY`（向后兼容）
+  - 同样优化Base URL的解析逻辑：
+    - 优先级1：构造函数直接传入的`base_url`参数
+    - 优先级2：环境变量`DOUBAO_BASE_URL`
+    - 优先级3：环境变量`ARK_BASE_URL`
+    - 优先级4：默认值
+  - 更新错误提示信息，明确支持多种配置方式
+  - 更新`.env`文件，添加豆包配置示例和注释
+- **人工修改**：无
+- **风险控制**：
+  - 完全向后兼容，现有`ARK_API_KEY`配置仍然有效
+  - 明确的优先级文档，避免配置混乱
+  - 不传Key时给出清晰的错误提示
+- **价值**：API Key配置更灵活，支持多种配置方式，便于部署和开发
+
+---
+
 ## 阶段性统计（自动维护，每次新增条目时更新）
 
 | 项 | 值 |
 |----|----|
-| 累计条目数 | 25 |
-| 涉及场景类别 | 代码理解、需求分析、接口设计、代码生成、文档撰写、算法理解、知识 Q&A、版本控制、字段精简、文档代码同步、架构调整、验证测试、交付总结、数据源验证、团队协作、数据源扩展、业务功能、数据采集 |
-| 已生成代码文件 | 18（api/*7 + hot_topic/scripts/train_thucnews_improved.py + train_thucnews_simple.py + topic_model_config.py + topic_model_trainer.py + example_usage.py + hot_topic/data_source/rss_client.py + hot_topic/scripts/fetch_recent_news.py + 原hot_topic模块） |
-| 新增核心文件 | 6（topic_model_config.py、topic_model_trainer.py、example_usage.py、train_thucnews_improved.py、rss_client.py、fetch_recent_news.py） |
-| 已生成文档文件 | 5（docs/api/internal-api.md、docs/AI_COLLAB_LOG.md、hot_topic/TRAINING_GUIDE.md、README_PYTHON_API.md、THUCNEWS_BERTOPIC_README.md） |
-| Git 提交次数 | 4（67eaabd → a3284db → b8e8a8a） |
-| 人工干预次数 | ≥ 8（范围收敛、字段精简×2、算法质疑、提交把关、任务书排除、语言检测修复、GDELT跳过） |
+| 累计条目数 | 28 |
+| 涉及场景类别 | 代码理解、需求分析、接口设计、代码生成、文档撰写、算法理解、知识 Q&A、版本控制、字段精简、文档代码同步、架构调整、验证测试、交付总结、数据源验证、团队协作、数据源扩展、业务功能、数据采集、代码替换、功能完善、项目维护、配置优化、环境变量管理、向后兼容 |
+| 已生成代码文件 | 19（api/*7 + hot_topic/scripts/train_thucnews_improved.py + train_thucnews_simple.py + topic_model_config.py + topic_model_trainer.py + example_usage.py + hot_topic/data_source/rss_client.py + hot_topic/scripts/fetch_recent_news.py + 原hot_topic模块） |
+| 新增核心文件 | 7（topic_model_config.py、topic_model_trainer.py、example_usage.py、train_thucnews_improved.py、rss_client.py、fetch_recent_news.py、doubao_client.py改进） |
+| 已生成文档文件 | 6（docs/api/internal-api.md、docs/AI_COLLAB_LOG.md、hot_topic/TRAINING_GUIDE.md、README_PYTHON_API.md、THUCNEWS_BERTOPIC_README.md、.env.example） |
+| Git 提交次数 | 7（67eaabd → a3284db → b8e8a8a → b93eb9e → b961c32 → d5fd6c0 → 7d7e299） |
+| 人工干预次数 | ≥ 9（范围收敛、字段精简×2、算法质疑、提交把关、任务书排除、语言检测修复、GDELT跳过、API Key配置要求） |
 | 训练阶段完成 | small预设测试训练完成 |
 | 支持主题数 | 默认50个，可配置 |
 | 数据源支持 | GDELT、RSS、THUCNews |
 | CSV采集功能 | ✓ 已完成，可一键获取24小时新闻 |
+| 事实核查功能 | ✓ 已接入真实多智能体系统 |
+| 配置灵活性 | ✓ 支持参数传入、DOUBAO_*、ARK_* 多种配置方式 |
 
 ---
 
