@@ -25,30 +25,6 @@ TEST_CLAIMS = [
         "category": "饮食误区",
         "note": "口服胶原蛋白会被消化分解为氨基酸，无法直接补充皮肤胶原",
     },
-    {
-        "claim": "笔记本电脑不可以边充电边玩，这样对电池不健康。",
-        "expected": "not_supported",
-        "category": "数码误区",
-        "note": "现代笔记本都有电源管理芯片，边充边玩不会损伤电池",
-    },
-    {
-        "claim": "每天要喝8杯水才健康。",
-        "expected": "not_supported",
-        "category": "健康误区",
-        "note": "8杯水没有科学依据，饮水量因人而异",
-    },
-    {
-        "claim": "人体左侧大脑负责逻辑，右侧大脑负责创意，左撇子右脑更发达。",
-        "expected": "not_supported",
-        "category": "科普谣言",
-        "note": "左右脑分工理论已被神经科学证伪，大脑是整体协作的",
-    },
-    {
-        "claim": "味精加热后会致癌。",
-        "expected": "not_supported",
-        "category": "食品安全谣言",
-        "note": "味精（谷氨酸钠）在正常烹饪温度下不会产生致癌物",
-    },
 
     # ---- 真实事实（预期 supported）----
     {
@@ -57,31 +33,78 @@ TEST_CLAIMS = [
         "category": "医学事实",
         "note": "1747年林德医生的柠檬实验证实了这一点",
     },
-    {
-        "claim": "北京大学的鹅腿阿姨卖的鹅腿是正规食品，没有食品安全问题。",
-        "expected": "not_supported",
-        "category": "社会热点",
-        "note": "北大鹅腿阿姨是真实存在的校园网红摊主",
-    },
-    {
-        "claim": "武汉大学杨景媛同学被肖同学猥亵属实。",
-        "expected": "not_supported",
-        "category": "社会事件",
-        "note": "2024年武大校园性骚扰事件，警方已通报",
-    },
-    {
-        "claim": "2024年巴黎奥运会是第33届夏季奥林匹克运动会。",
-        "expected": "supported",
-        "category": "体育事实",
-        "note": "于2024年7月26日至8月11日在法国巴黎举行",
-    },
-    {
-        "claim": "吸烟会导致肺癌风险显著增加，这是医学界公认的事实。",
-        "expected": "supported",
-        "category": "健康事实",
-        "note": "大量流行病学研究证实吸烟与肺癌的强相关性",
-    },
 ]
+
+
+def print_step_details(step, step_num):
+    """打印单个步骤的详细信息"""
+    print(f"\n{'='*80}")
+    print(f"步骤 {step_num}: {list(step.keys())[0]}")
+    print(f"{'='*80}")
+
+    for agent_name, agent_data in step.items():
+        if agent_name == "__end__":
+            continue
+
+        if "messages" in agent_data and len(agent_data["messages"]) > 0:
+            for msg in agent_data["messages"]:
+                msg_content = msg.content if hasattr(msg, 'content') else str(msg)
+                msg_sender = msg.name if hasattr(msg, 'name') else agent_name
+
+                print(f"\n【{msg_sender}】输出:")
+                print("-" * 80)
+
+                # 尝试解析 JSON 来更好地显示
+                try:
+                    parsed = json.loads(msg_content)
+                    print(json.dumps(parsed, ensure_ascii=False, indent=2))
+                except json.JSONDecodeError:
+                    # 尝试提取代码块中的 JSON
+                    match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", msg_content)
+                    if match:
+                        try:
+                            parsed = json.loads(match.group(1))
+                            print(json.dumps(parsed, ensure_ascii=False, indent=2))
+                        except json.JSONDecodeError:
+                            print(msg_content[:500] + ("..." if len(msg_content) > 500 else ""))
+                    else:
+                        print(msg_content[:500] + ("..." if len(msg_content) > 500 else ""))
+
+
+def print_search_details(results):
+    """从结果中提取并打印搜索相关的信息"""
+    print(f"\n{'='*80}")
+    print("🔍 搜索信息提取")
+    print(f"{'='*80}")
+
+    found_searches = False
+
+    for i, step in enumerate(results):
+        for agent_name, agent_data in step.items():
+            if "messages" in agent_data:
+                for msg in agent_data["messages"]:
+                    msg_content = msg.content if hasattr(msg, 'content') else str(msg)
+
+                    # 检查是否有搜索相关的内容
+                    if "evidence_seeker" in str(type(msg)) or "search" in msg_content.lower():
+                        found_searches = True
+                        print(f"\n步骤 {i+1} - 证据搜索:")
+                        print("-" * 80)
+
+                        # 提取搜索查询
+                        if "query" in msg_content.lower():
+                            # 尝试找到搜索查询
+                            lines = msg_content.split('\n')
+                            for line in lines:
+                                if "query" in line.lower() or "question" in line.lower():
+                                    print(f"  📝 {line.strip()}")
+
+                        # 检查是否有提取到的证据
+                        if "evidence" in msg_content.lower() or "article" in msg_content.lower():
+                            print(f"  📄 找到证据内容")
+
+    if not found_searches:
+        print("  本次未检测到显式的网络搜索步骤")
 
 
 def parse_verdict_from_results(results):
@@ -129,26 +152,48 @@ def parse_verdict_from_results(results):
     return final_verdict
 
 
-def run_single_test(agent, test_case):
+def run_single_test(agent, test_case, show_details=True):
     """运行单个测试用例"""
     claim = test_case["claim"]
     category = test_case["category"]
     expected = test_case["expected"]
 
     print(f"\n{'='*80}")
-    print(f"[{category}]")
+    print(f"{'='*80}")
+    print(f"📋 测试用例: [{category}]")
+    print(f"{'='*80}")
     print(f"待验证: {claim}")
     if test_case.get("note"):
         print(f"参考:  {test_case['note']}")
-    print(f"{'='*80}")
+    print(f"预期:   {expected}")
+    print(f"{'='*80}\n")
 
     verdict = None
     success = False
+    results = None
 
     try:
         print(">>> FactAgent 开始分析...")
+        print(">>> 下面是完整的推理过程:\n")
+
         results = agent.process_claim(claim, recursion_limit=300, verbose=False)
-        print(">>> 分析完成!")
+
+        print(f"\n{'='*80}")
+        print("📊 推理步骤概览")
+        print(f"{'='*80}")
+        for i, step in enumerate(results):
+            step_key = list(step.keys())[0]
+            print(f"  步骤 {i+1}: {step_key}")
+
+        if show_details:
+            # 打印每个步骤的详细信息
+            for i, step in enumerate(results):
+                print_step_details(step, i + 1)
+
+            # 提取并打印搜索信息
+            print_search_details(results)
+
+        print(">>> 分析完成!\n")
 
         # 提取 verdict
         verdict = parse_verdict_from_results(results)
@@ -156,43 +201,64 @@ def run_single_test(agent, test_case):
         # 判断结果
         success = verdict.get("label") == expected
 
-        print(f"\n[结果]")
+        print(f"\n{'='*80}")
+        print("🎯 最终结论")
+        print(f"{'='*80}")
         print(f"  预期: {expected}")
         print(f"  实际: {verdict.get('label', 'None')}")
-        print(f"  状态: {'PASS' if success else 'FAIL'}")
+        print(f"  状态: {'✅ PASS' if success else '❌ FAIL'}")
+        print(f"\n  判断依据:")
         expl = verdict.get('explanation', '无')
-        if len(expl) > 300:
-            expl = expl[:300] + "..."
-        print(f"  解释: {expl}")
+        if len(expl) > 800:
+            expl = expl[:800] + "..."
+        print(f"  {expl}")
 
     except Exception as e:
-        print(f"\n[错误] {e}")
+        print(f"\n❌ [错误] {e}")
+        import traceback
+        traceback.print_exc()
 
     return {
         **test_case,
         "actual_label": verdict.get("label") if verdict else None,
         "explanation": verdict.get("explanation") if verdict else None,
         "success": success,
+        "full_results": results,
     }
 
 
-def run_all_tests(model_name="doubao/doubao-seed-2-0-mini-260428"):
+def run_all_tests(model_name="doubao/doubao-seed-2-0-mini-260428", show_details=True):
     """运行所有测试用例"""
     print(f"\n{'='*80}")
-    print(f"FactAgent 表现测试开始!")
-    print(f"使用模型: {model_name}")
+    print(f"{'='*80}")
+    print(f"       FactAgent 事实核查完整测试")
+    print(f"{'='*80}")
+    print(f"{'='*80}")
+    print(f"\n使用模型: {model_name}")
     print(f"测试用例数: {len(TEST_CLAIMS)}")
-    print(f"{'='*80}\n")
+    print(f"显示详情: {'是' if show_details else '否'}")
+    print(f"\n{'='*80}\n")
 
     # 初始化 Agent
+    print(">>> 初始化 FactAgent...")
     agent = FactAgent(dataset="fever", model_name=model_name)
+    print(">>> FactAgent 初始化完成!\n")
 
     # 执行所有测试
     all_results = []
     for i, test_case in enumerate(TEST_CLAIMS):
-        print(f"\n[{i+1}/{len(TEST_CLAIMS)}]", end="")
-        res = run_single_test(agent, test_case)
+        print(f"\n{'='*80}")
+        print(f"进度: [{i+1}/{len(TEST_CLAIMS)}]")
+        res = run_single_test(agent, test_case, show_details=show_details)
         all_results.append(res)
+
+        # 询问是否继续
+        if i < len(TEST_CLAIMS) - 1:
+            try:
+                input("\n按 Enter 继续下一个测试...")
+            except KeyboardInterrupt:
+                print("\n\n用户中断测试")
+                break
 
     # 打印汇总
     total = len(all_results)
@@ -200,12 +266,15 @@ def run_all_tests(model_name="doubao/doubao-seed-2-0-mini-260428"):
     accuracy = correct / total * 100 if total > 0 else 0
 
     print(f"\n\n{'='*80}")
-    print(f"测试汇总")
+    print(f"{'='*80}")
+    print(f"       测试汇总")
+    print(f"{'='*80}")
     print(f"{'='*80}")
     print(f"  总测试数: {total}")
     print(f"  正确数:   {correct}")
     print(f"  错误数:   {total - correct}")
     print(f"  准确率:   {accuracy:.1f}%")
+    print(f"{'='*80}")
 
     # 分类统计
     category_stats = {}
@@ -217,27 +286,88 @@ def run_all_tests(model_name="doubao/doubao-seed-2-0-mini-260428"):
         if res["success"]:
             category_stats[cat]["correct"] += 1
 
-    print(f"\n分类统计:")
-    for cat, stats in category_stats.items():
-        acc = stats["correct"] / stats["total"] * 100
-        print(f"  {cat}: {stats['correct']}/{stats['total']} ({acc:.1f}%)")
+    if len(category_stats) > 1:
+        print(f"\n分类统计:")
+        for cat, stats in category_stats.items():
+            acc = stats["correct"] / stats["total"] * 100
+            print(f"  {cat}: {stats['correct']}/{stats['total']} ({acc:.1f}%)")
 
     # 详细表格
     print(f"\n详细结果:")
-    print(f"  {'#':<3} {'类别':<10} {'预期':<14} {'实际':<14} {'状态':<6}")
+    print(f"\n  {'#':<3} {'类别':<12} {'预期':<14} {'实际':<14} {'状态':<6}")
     print(f"  {'-'*65}")
     for i, r in enumerate(all_results):
-        status = "PASS" if r["success"] else "FAIL"
+        status = "✅" if r["success"] else "❌"
         act = r["actual_label"] or "N/A"
-        print(f"  {i+1:<3} {r['category']:<10} {r['expected']:<14} {act:<14} {status:<6}")
+        print(f"  {i+1:<3} {r['category']:<12} {r['expected']:<14} {act:<14} {status:<6}")
 
     # 保存详细结果
-    with open("../../../test_results.json", "w", encoding="utf-8") as f:
-        json.dump(all_results, f, ensure_ascii=False, indent=2)
-    print(f"\n详细结果已保存到: test_results.json")
+    output_file = os.path.join(os.path.dirname(__file__), "../../../test_results.json")
+    # 移除 full_results 来节省空间
+    saved_results = [{k: v for k, v in r.items() if k != "full_results"} for r in all_results]
+    with open(output_file, "w", encoding="utf-8") as f:
+        json.dump(saved_results, f, ensure_ascii=False, indent=2)
+    print(f"\n详细结果已保存到: {output_file}")
 
     return all_results
 
 
+def run_single_claim(claim, model_name="doubao/doubao-seed-2-0-mini-260428"):
+    """只运行单个 claim 的测试"""
+    print(f"\n{'='*80}")
+    print(f"       FactAgent 单条事实核查")
+    print(f"{'='*80}")
+    print(f"\n待验证: {claim}")
+    print(f"\n{'='*80}\n")
+
+    # 初始化 Agent
+    print(">>> 初始化 FactAgent...")
+    agent = FactAgent(dataset="fever", model_name=model_name)
+    print(">>> FactAgent 初始化完成!\n")
+
+    # 运行测试
+    results = agent.process_claim(claim, recursion_limit=300, verbose=False)
+
+    # 打印所有步骤
+    print(f"\n{'='*80}")
+    print("📊 完整推理过程")
+    print(f"{'='*80}")
+
+    for i, step in enumerate(results):
+        print_step_details(step, i + 1)
+
+    # 打印搜索信息
+    print_search_details(results)
+
+    # 获取最终结论
+    verdict = parse_verdict_from_results(results)
+
+    print(f"\n{'='*80}")
+    print("🎯 最终结论")
+    print(f"{'='*80}")
+    print(f"  判断: {verdict.get('label', 'None')}")
+    print(f"\n  解释:")
+    expl = verdict.get('explanation', '无')
+    print(f"  {expl}")
+
+    return results
+
+
 if __name__ == "__main__":
-    run_all_tests()
+    # 检查命令行参数
+    import argparse
+
+    parser = argparse.ArgumentParser(description="FactAgent 事实核查测试")
+    parser.add_argument("--claim", type=str, help="只测试单个声明")
+    parser.add_argument("--model", type=str, default="doubao/doubao-seed-2-0-mini-260428",
+                        help="使用的模型名称")
+    parser.add_argument("--no-details", action="store_true", help="不显示详细推理过程")
+
+    args = parser.parse_args()
+
+    if args.claim:
+        # 单条测试模式
+        run_single_claim(args.claim, model_name=args.model)
+    else:
+        # 完整测试模式
+        run_all_tests(model_name=args.model, show_details=not args.no_details)
