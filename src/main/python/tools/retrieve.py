@@ -163,13 +163,20 @@ class SearchEngineRetriever:
         if search_query == self.skip_query_token:
             return None
 
+        # 证据链 trace 句柄（无活跃 trace 时为 None，静默跳过）
+        from src.main.python import tracing
+        trace = tracing.get_current()
+
         retrieved_doc = ""
+        chosen_url = ""
         search_server_resp = self._query_search_server(search_query)
         if not search_server_resp:
             logging.warning(
                 f'Server search did not produce any results for "{search_query}" query.'
                 ' returning an empty set of results for this query.'
             )
+            if trace:
+                trace.search(search_query, 0, "", "")
             return retrieved_doc
 
         for i, rd in enumerate(search_server_resp):
@@ -186,10 +193,15 @@ class SearchEngineRetriever:
                     article_content = f"Article Title: {title} \nGoogle Snippet: {snippet}\nArticle Content: \n{content}"
                     retrieved_doc = self._process_content(search_query, article_content)
                 if retrieved_doc:
+                    chosen_url = url
                     break
             if link_choosen != -1:
                 article_content = f"Article Title: {search_server_resp[link_choosen].get('title', '')} \nGoogle Snippet: {search_server_resp[link_choosen].get('snippet', ' ')}"
                 retrieved_doc = self._process_content(search_query, article_content)
+                chosen_url = search_server_resp[link_choosen].get('link', '')
+
+        if trace:
+            trace.search(search_query, len(search_server_resp), chosen_url, retrieved_doc)
 
         return retrieved_doc
 

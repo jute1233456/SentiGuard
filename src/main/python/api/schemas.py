@@ -4,7 +4,7 @@
 """
 from __future__ import annotations
 
-from typing import Generic, List, Literal, Optional, TypeVar
+from typing import Any, Generic, List, Literal, Optional, TypeVar
 
 from pydantic import BaseModel, Field
 
@@ -67,3 +67,45 @@ class FactCheckData(BaseModel):
     isTrue: bool
     conclusion: str
     explanation: str
+
+
+# ---------------------------------------------------------------------------
+# F2 POST /internal/v1/fact-check/detail（详细版，含推理过程与证据）
+# ---------------------------------------------------------------------------
+class EvidenceItem(BaseModel):
+    """单条证据：子声明 → 搜索查询 → 选中 URL → 证据摘要"""
+    subclaim: str = ""
+    query: str = ""
+    chosenUrl: str = ""
+    evidenceSnippet: str = ""
+
+
+class TraceStep(BaseModel):
+    """单个推理步骤（节点名 + 结构化输出）"""
+    node: str
+    output: Any  # structured_response，dict 或 list
+
+
+class TraceRoute(BaseModel):
+    """Supervisor 路由记录"""
+    graph: str
+    next: str
+
+
+class FactCheckTrace(BaseModel):
+    """完整推理路径"""
+    runId: str = ""
+    claim: str = ""
+    route: List[TraceRoute] = []
+    steps: List[TraceStep] = []
+    searches: List[EvidenceItem] = []
+    verdict: Optional[dict] = None
+
+
+class FactCheckDetailData(BaseModel):
+    """F2 响应 data — 含 F1 三字段 + 推理过程 + 证据"""
+    isTrue: bool
+    conclusion: str
+    explanation: str
+    trace: FactCheckTrace
+    evidenceItems: List[EvidenceItem] = []

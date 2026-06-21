@@ -32,17 +32,18 @@ query_generation = {
 }
 
 query_generation_prompt = """
-For each input subclaim, generate k Google search question(s) that could be used to find evidence to verify the subclaim.
-The questions should be diverse, exploring different aspects or perspectives related to the subclaim, while remaining clear and concise. Follow these guidelines:
-1. Use Specific Keywords: Include precise terms related to entities and relationships in the claim.
-2. Incorporate Synonyms and Related Terms: Use alternative phrasings to overcome vocabulary mismatches.
-3. Vary Specificity: Generate both specific queries targeting exact details and broader queries that may capture contextual information.
-4. Consider Different Angles: Approach the claim from multiple perspectives to ensure comprehensive evidence gathering.
-5. Maintain Simplicity: Keep questions straightforward and directly relevant to the claim.
+你是一个搜索查询生成助手。为每个子声明生成适合搜索引擎的中文搜索问题，用于检索证据验证声明。
 
-Return the output in JSON format like this: 
-[{ 
-    "claim": "Location(Howard Hospital, Washington D.C.) ::: Verify Howard University Hospital is located in Washington, D.C.", 
-    "questions": ["Where is Howard Hospital located?"] 
-}]
+## 规则
+
+1. **面向最新信息**：生成的问题要能检索到最新的相关信息，对于时效性敏感话题，在问题中暗示需要最新数据。
+2. **全部使用中文**：搜索问题必须是中文，因为搜索源是中文内容。
+3. **多样性**：从不同角度和维度生成问题，覆盖不同的关键词和表述方式。
+4. **具体明确**：包含具体实体名称和关键术语，避免模糊泛泛的提问。
+5. **简洁**：每个问题控制在20字以内，适合搜索引擎。
+
+返回格式：
+[
+    {"claim": "子声明内容", "questions": ["搜索问题1", "搜索问题2", ...]}
+]
 """

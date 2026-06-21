@@ -59,6 +59,7 @@
 |------|------|------|------|------|
 | H1   | GET  | `/internal/v1/hotspots`    | 获取热点列表（按热度排序） | 已定义 |
 | F1   | POST | `/internal/v1/fact-check`  | 事实核查（简易版，只返回结论与解释） | 已定义 |
+| F2   | POST | `/internal/v1/fact-check/detail` | 事实核查（详细版，含推理过程与证据链） | 已定义 |
 
 ---
 
@@ -451,10 +452,256 @@ public class FactCheckData {
 
 ---
 
-## 变更记录
+## F2. 事实核查（详细版，含推理过程与证据链）
+
+### 基本信息
+- **方法**：`POST`
+- **路径**：`/internal/v1/fact-check/detail`
+- **用途**：在 F1 的 `isTrue` + `conclusion` + `explanation` 基础上，额外返回完整的推理路径（trace）和展平证据列表
+- **同步/异步**：同步
+- **幂等性**：否
+
+### 请求
+
+#### 请求头
+```
+Content-Type: application/json
+X-Internal-Token: <服务间共享密钥>
+X-Trace-Id: <uuid>            （可选）
+```
+
+#### 请求体
+
+```json
+{
+  "claim": "2024年巴黎奥运会是第33届夏季奥林匹克运动会。"
+}
+```
+
+#### 字段说明（请求）
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `claim` | string | 是 | 待核查的声明，长度 1~2000 字 |
+
+### 响应
+
+#### HTTP 状态码
+- `200 OK`：核查完成
+- `400 Bad Request`：参数错误
+- `401 Unauthorized`：token 无效
+- `408 Request Timeout`：核查超时
+- `503 Service Unavailable`：下游 LLM 不可用
+
+#### 响应体
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "isTrue": true,
+    "conclusion": "声明真实：多个权威来源相互印证。",
+    "explanation": "国际奥委会官网与新华社等权威媒体均明确指出...",
+    "trace": {
+      "runId": "20260621_214615_a1ec",
+      "claim": "2024年巴黎奥运会是第33届夏季奥林匹克运动会。",
+      "route": [
+        { "graph": "main", "next": "input_ingestor" },
+        { "graph": "ingestion", "next": "claim_splitter" },
+        { "graph": "ingestion", "next": "claim_classification" },
+        { "graph": "ingestion", "next": "FINISH" },
+        { "graph": "main", "next": "query_generator" },
+        { "graph": "main", "next": "evidence_seeker" },
+        { "graph": "main", "next": "verdict_predictor" },
+        { "graph": "main", "next": "FINISH" }
+      ],
+      "steps": [
+        {
+          "node": "claim_splitter",
+          "output": { "subclaims": ["2024年巴黎奥运会是第33届夏季奥林匹克运动会"] }
+        },
+        {
+          "node": "query_generator",
+          "output": {
+            "subclaim_with_questions": [
+              {
+                "subclaim": "2024年巴黎奥运会是第33届夏季奥林匹克运动会",
+                "questions": ["2024年巴黎奥运会是第几届？", ...]
+              }
+            ]
+          }
+        },
+        {
+          "node": "evidence_seeker",
+          "output": {
+            "subclaims_with_query_evidence": [
+              {
+                "subclaim": "...",
+                "queries_with_evidence": [
+                  { "query": "...", "evidence": "..." }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "node": "verdict_predictor",
+          "output": {
+            "result": { "label": "supported", "explanation": "..." }
+          }
+        }
+      ],
+      "searches": [
+        {
+          "subclaim": "",
+          "query": "2024年巴黎奥运会 第几届？",
+          "chosenUrl": "https://olympics.com/zh/olympic-games/paris-2024",
+          "evidenceSnippet": "2024年巴黎奥运会是第33届夏季奥林匹克运动会..."
+        }
+      ],
+      "verdict": {
+        "label": "supported",
+        "explanation": "国际奥委会官网确认..."
+      }
+    },
+    "evidenceItems": [
+      {
+        "subclaim": "2024年巴黎奥运会是第33届夏季奥林匹克运动会",
+        "query": "2024年巴黎奥运会 第几届？",
+        "chosenUrl": "https://olympics.com/zh/olympic-games/paris-2024",
+        "evidenceSnippet": "2024年巴黎奥运会是第33届夏季奥林匹克运动会..."
+      }
+    ]
+  }
+}
+```
+
+#### 字段说明（响应）
+
+##### data 顶层
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `isTrue` | boolean | 真假判定 |
+| `conclusion` | string | 一句话结论 |
+| `explanation` | string | 详细解释 |
+| `trace` | object | 完整推理路径（见下） |
+| `evidenceItems` | array | 展平证据列表，每条含子声明上下文 |
+
+##### trace 对象
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `runId` | string | 本次 trace 运行唯一 ID |
+| `claim` | string | 原始声明文本 |
+| `route` | array | Supervisor 路由序列：`{graph, next}` |
+| `steps` | array | 各智能体节点的结构化输出：`{node, output}` |
+| `searches` | array | 搜索引擎调用记录，每项同 `EvidenceItem` 结构 |
+| `verdict` | object | 最终判定：`{label, explanation}` |
+
+##### evidenceItems[] 单条证据
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `subclaim` | string | 该证据对应的子声明 |
+| `query` | string | 搜索引擎使用的查询语句 |
+| `chosenUrl` | string | 选中作为证据来源的 URL |
+| `evidenceSnippet` | string | 从该 URL 抽取的与查询相关的摘要 |
+
+### 与 F1 的关系
+
+- F2 是 F1 的超集：`isTrue` / `conclusion` / `explanation` 三字段完全一致
+- Java 端可按需选择：
+  - 只需结论 → 调 F1（更快，响应体更小）
+  - 需要展示推理过程 / 证据来源 → 调 F2
+- F1 和 F2 共享同一个 `FactCheckRequest` 请求体
+
+### Java 端调用示例
+
+```java
+// 请求体与 F1 完全一致
+Map<String, Object> body = Map.of(
+    "claim", "2024年巴黎奥运会是第33届夏季奥林匹克运动会。"
+);
+
+HttpHeaders headers = new HttpHeaders();
+headers.setContentType(MediaType.APPLICATION_JSON);
+headers.set("X-Internal-Token", internalToken);
+
+ResponseEntity<FactCheckDetailResponse> resp = restTemplate.exchange(
+    "http://fastapi.internal:8000/internal/v1/fact-check/detail",
+    HttpMethod.POST,
+    new HttpEntity<>(body, headers),
+    FactCheckDetailResponse.class
+);
+
+FactCheckDetailData data = resp.getBody().getData();
+boolean isTrue = data.isTrue();
+List<EvidenceItem> evidence = data.getEvidenceItems();
+List<TraceStep> steps = data.getTrace().getSteps();
+```
+
+#### 对应 DTO
+
+```java
+public class FactCheckDetailResponse {
+    private int code;
+    private String message;
+    private FactCheckDetailData data;
+}
+
+public class FactCheckDetailData {
+    private boolean isTrue;
+    private String conclusion;
+    private String explanation;
+    private FactCheckTrace trace;
+    private List<EvidenceItem> evidenceItems;
+}
+
+public class FactCheckTrace {
+    private String runId;
+    private String claim;
+    private List<TraceRoute> route;
+    private List<TraceStep> steps;
+    private List<EvidenceItem> searches;
+    private Verdict verdict;
+}
+
+public class TraceRoute {
+    private String graph;
+    private String next;
+}
+
+public class TraceStep {
+    private String node;
+    private Object output;
+}
+
+public class EvidenceItem {
+    private String subclaim;
+    private String query;
+    private String chosenUrl;
+    private String evidenceSnippet;
+}
+
+public class Verdict {
+    private String label;
+    private String explanation;
+}
+```
+
+### 设计说明
+
+1. **F2 是 F1 的超集**，两者共享请求体 `FactCheckRequest`，Java 端只改 URL 和 DTO 即可升级
+2. **trace.steps 保留原始结构化输出**，不做二次加工，方便前端按需渲染
+3. **evidenceItems 是展平视图**，将 search 事件与 evidence_seeker 的 subclaim 映射拼接，便于直接展示"哪条证据支撑哪个子声明"
+4. **trace.route** 记录 supervisor 路由序列，可用于可视化智能体调用链路
+5. **verdict** 放在 trace 内，与 steps / searches 平级，保持事件完整性
 
 | 日期 | 版本 | 变更 |
 |------|------|------|
 | 2026-06-16 | 0.1.0 | 初稿，定义热点列表接口 H1 |
 | 2026-06-16 | 0.2.0 | 新增事实核查接口 F1（简易版，仅返回结论与解释） |
 | 2026-06-16 | 0.2.1 | F1 响应体精简为 `isTrue`(布尔) + `conclusion` + `explanation` 三字段 |
+| 2026-06-21 | 0.3.0 | 新增 F2 POST `/internal/v1/fact-check/detail`（详细版，含推理过程与证据链） |

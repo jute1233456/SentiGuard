@@ -748,16 +748,47 @@
   - 网络不稳定时不反复轰炸远程
 - **价值**：本地改动已落盘成提交；远程整合待网络恢复后处理
 
+### 条目 #35 — 推理路径 Trace 模块 + Prompt 全中文/强制搜索改造
+
+- **日期**：2026-06-21
+- **场景**：功能完善 / 提示词优化
+- **关键 Prompt**：
+  > "实现推理路径 trace 收集器"
+  > "在 process_claim 包裹流，包含 set_current、claim_start、claim_end 和 finalize"
+  > "为什么没有证据"
+  > "方案B，必须搜索，并且要LLM注意时间一定要最新的，第二点必须要生成中文回答不要英文"
+- **AI 产出**：
+  - 新建 `src/main/python/tracing.py`：`TraceCollector` 类 + `set_current/get_current` 线程局部句柄，记录 claim_start/supervisor/step/search/verdict/claim_end 六类事件
+  - `main_agent.py` 改造：`process_claim` 用 try/finally 包裹，确保 trace 建立和清理
+  - `retrieve.py` 改造：`_retrieve_single` 注入 trace.search 调用，记录 query/结果数/选中URL/证据摘要
+  - `fact_check.py`：记录 trace 文件路径日志；`.gitignore` 追加 `logs/`
+  - Trace 文件验证：生成的 JSON 合法、结构完整（153 行），控制台缩进树可读性良好
+  - **Prompt 全面改造**：
+    - `evidence_seeking_prompt`：从"内容抽取助手"重写为"强制搜索 agent"——必须调用搜索工具、追求最新信息、全部中文输出
+    - `verdict_prediction_prompt`：从英文改为全中文，判定理由必须中文撰写
+    - `query_generation_prompt`：改为全中文，生成面向最新信息的中文搜索问题
+- **人工修改**：无
+- **风险控制**：
+  - trace 用 `threading.local` 实现线程隔离，FastAPI 多请求安全
+  - `set_current(None)` 在 finally 块中清理，避免请求间泄漏
+  - trace 默认开启但可关闭（`enabled=False`），不影响既有行为
+  - `search` 事件仅在真正调用搜索工具时记录，不编造空事件
+  - Prompt 改造保留 `response_format` schema 不变，只改提示文本，向后兼容
+- **价值**：
+  - Trace 模块为调试和报告提供可视化推理路径
+  - 证据链 trace 打通 LangGraph 节点 → 搜索引擎 → 最终判定全链路
+  - 强制搜索 + 中文输出提升输出质量和时效性，修复"证据全靠 LLM 记忆"问题
+
 ---
 
 ## 阶段性统计（自动维护，每次新增条目时更新）
 
 | 项 | 值 |
 |----|----|
-| 累计条目数 | 34 |
-| 涉及场景类别 | 代码理解、需求分析、接口设计、代码生成、文档撰写、算法理解、知识 Q&A、版本控制、字段精简、文档代码同步、架构调整、验证测试、交付总结、数据源验证、团队协作、数据源扩展、业务功能、数据采集、代码替换、功能完善、项目维护、配置优化、环境变量管理、向后兼容、Bug 排查、测试用例、接口联调 |
-| 已生成代码文件 | 20（api/*7 + hot_topic/scripts/train_thucnews_improved.py + train_thucnews_simple.py + topic_model_config.py + topic_model_trainer.py + example_usage.py + hot_topic/data_source/rss_client.py + hot_topic/scripts/fetch_recent_news.py + 原hot_topic模块 + retrieve.py重构） |
-| 新增核心文件 | 8（topic_model_config.py、topic_model_trainer.py、example_usage.py、train_thucnews_improved.py、rss_client.py、fetch_recent_news.py、doubao_client.py改进、CLAUDE.md） |
+| 累计条目数 | 35 |
+| 涉及场景类别 | 代码理解、需求分析、接口设计、代码生成、文档撰写、算法理解、知识 Q&A、版本控制、字段精简、文档代码同步、架构调整、验证测试、交付总结、数据源验证、团队协作、数据源扩展、业务功能、数据采集、代码替换、功能完善、项目维护、配置优化、环境变量管理、向后兼容、Bug 排查、测试用例、接口联调、提示词优化 |
+| 已生成代码文件 | 23（api/*7 + hot_topic/scripts/train_thucnews_improved.py + train_thucnews_simple.py + topic_model_config.py + topic_model_trainer.py + example_usage.py + hot_topic/data_source/rss_client.py + hot_topic/scripts/fetch_recent_news.py + 原hot_topic模块 + retrieve.py重构 + tracing.py + evidence_seeking/query_generation/verdict_prediction prompt改造） |
+| 新增核心文件 | 9（tracing.py + 上述 8 个） |
 | 已生成文档文件 | 7（docs/api/internal-api.md、docs/AI_COLLAB_LOG.md、hot_topic/TRAINING_GUIDE.md、README_PYTHON_API.md、THUCNEWS_BERTOPIC_README.md、.env.example、CLAUDE.md） |
 | Git 提交次数 | 8（67eaabd → a3284db → b8e8a8a → b93eb9e → b961c32 → d5fd6c0 → 7d7e299 → 7e6e37e） |
 | 人工干预次数 | ≥ 14（含本次：CLAUDE.md 追加日志强调、retrieve.py 职责边界否决第一版、推送暂缓） |
@@ -768,6 +799,8 @@
 | 事实核查功能 | ✓ 已接入真实多智能体系统，证据检索走 LLM 抽象层（豆包） |
 | 配置灵活性 | ✓ 支持参数传入、DOUBAO_*、ARK_* 多种配置方式 |
 | 证据检索 | ✓ Anspire 搜索链路实测打通，端到端 API 实测通过 |
+| Trace 推理路径 | ✓ tracing.py 完成，覆盖 supervisor 路由 + 各节点结构化输出 + 证据链 + verdict |
+| Prompt 改造 | ✓ evidence_seeking（强制搜索+中文+最新）、verdict_prediction（中文）、query_generation（中文） |
 | 已知待办 | verdict 证据衔接准确率（57%）、explanation 字段文本化、Gemini 残留清理（requirements/.env/README/test_search）、远程推送整合 |
 
 ---

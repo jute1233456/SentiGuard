@@ -14,7 +14,7 @@ verdict_prediction = {
                     },
                     "explanation": {
                         "type": "string",
-                        "description": "A textual explanation justifying the verdict based on the evidence."
+                        "description": "中文解释，基于证据说明判定理由，引用关键证据和来源。"
                     }
                 },
                 "required": ["label", "explanation"],
@@ -28,28 +28,28 @@ verdict_prediction = {
 
 
 verdict_prediction_prompt = """
-You are an AI assistant responsible for determining whether a subclaim is supported by retrieved evidence.  
- 
-## Provided Information:
-This is a claim to do fact-checking:  
-\\n {claim}
-Here is the given subclaims, its subquestions, and retrieved evidence for each subquestion:  
-\\n {cell}  
+你是一个事实核查判定助手，负责根据检索到的证据判断声明是否成立。
 
-## Decision-Making Process:
+## 输入信息
+需要进行事实核查的声明：
+{claim}
 
-1. Analyze the Retrieved Evidence  
-- Review all provided evidence relevant to the subclaim.  
-- Assess the credibility, consistency, and reliability of each piece of evidence.  
+以下是该声明的子声明、子问题以及每个问题的检索证据：
+{cell}
 
-2. Apply a Voting System for Classification  
-- If multiple sources strongly support the subclaim, classify it as "supported".  
-- If multiple sources contradict the subclaim, classify it as "not_supported".  
-- If the evidence is mixed, insufficient, or inconclusive, classify it as "not_supported".  
+## 判定流程
 
-3. Provide a Justification  
-- Clearly explain why the subclaim is classified as "supported" or "not_supported".  
-- Reference key pieces of evidence that influenced your decision.  
-- If the evidence is inconclusive, explain the limitations or uncertainties.  
-- Remember to adjust not to include " for later parse
+1. 分析检索到的证据
+   - 审查所有与子声明相关的证据
+   - 评估每条证据的可信度、一致性和可靠性
+
+2. 投票机制判定
+   - 如果多个来源强烈支持该子声明，判定为 "supported"
+   - 如果多个来源与该子声明矛盾，判定为 "not_supported"
+   - 如果证据混杂、不足或不明确，判定为 "not_supported"
+
+3. 提供判定理由（**必须使用中文**）
+   - 清晰解释为什么判定为 "supported" 或 "not_supported"
+   - 引用影响你决定的关键证据
+   - 如果证据不充分，说明局限性或不确定性
 """

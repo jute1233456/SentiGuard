@@ -19,6 +19,7 @@ from src.main.python.prompts.query_generation import query_generation_prompt, qu
 from src.main.python.prompts.evidence_seeking import evidence_seeking_prompt, evidence_seeking
 from src.main.python.prompts.verdict_prediction import verdict_prediction_prompt, verdict_prediction
 from src.main.python.tools.retrieve import search_retrieve_news
+from src.main.python import tracing
 
 load_dotenv()
 
@@ -38,7 +39,8 @@ class FactAgent:
     def __init__(self, dataset: str,
                  model_name: str = "doubao/doubao-seed-2-0-mini-260428",
                  provider: Optional[str] = None,
-                 temperature: float = 0.2):
+                 temperature: float = 0.2,
+                 enable_trace: bool = True):
         self.dataset = dataset
         self.model_name = model_name
         self.provider = provider or detect_provider(model_name)
@@ -50,11 +52,13 @@ class FactAgent:
             provider=self.provider,
             temperature=self.temperature,
         )
+        # 推理路径与证据链 trace 收集器（默认开启，可关闭）
+        self.trace = tracing.TraceCollector(enabled=enable_trace)
         self._setup_agents()
         self._build_graphs()
 
     # ------------------------------------------------------------------
-    def _make_supervisor_node(self, members: list):
+    def _make_supervisor_node(self, members: list, graph_name: str = "main"):
         options = ["FINISH"] + members
 
         # 在系统提示里明确加上 "json" 单词，满足豆包要求！
@@ -77,6 +81,7 @@ class FactAgent:
             # 手动解析返回内容里的 JSON
             parsed = self._extract_json_from_content(content)
             goto = parsed.get("next", "FINISH")
+            self.trace.supervisor(graph_name, goto)
             if goto == "FINISH":
                 goto = END
             return Command(goto=goto, update={"next": goto})
@@ -146,9 +151,11 @@ class FactAgent:
     def _build_input_ingestion_graph(self):
         def claim_decomposition_node(state: State) -> Command:
             result = self.claim_decomposition_agent.invoke(state)
+            sr = result.get("structured_response", {})
+            self.trace.step("claim_decomposition", sr)
             return Command(
                 update={"messages": [
-                    HumanMessage(content=str(result["structured_response"]["subclaims"]),
+                    HumanMessage(content=str(sr.get("subclaims")),
                                  name="claim_decomposition"),
                 ]},
                 goto="supervisor",
@@ -156,9 +163,11 @@ class FactAgent:
 
         def claim_classification_node(state: State) -> Command:
             result = self.claim_classification_agent.invoke(state)
+            sr = result.get("structured_response", {})
+            self.trace.step("claim_classification", sr)
             return Command(
                 update={"messages": [
-                    HumanMessage(content=str(result["structured_response"]["subclaim_type_dict"]),
+                    HumanMessage(content=str(sr.get("subclaim_type_dict")),
                                  name="claim_classification"),
                 ]},
                 goto="supervisor",
@@ -166,16 +175,19 @@ class FactAgent:
 
         def claim_splitter_node(state: State) -> Command:
             result = self.claim_splitter_agent.invoke(state)
+            sr = result.get("structured_response", {})
+            self.trace.step("claim_splitter", sr)
             return Command(
                 update={"messages": [
-                    HumanMessage(content=str(result["structured_response"]["subclaims"]),
+                    HumanMessage(content=str(sr.get("subclaims")),
                                  name="claim_splitter"),
                 ]},
                 goto="supervisor",
             )
 
         input_ingestion_node = self._make_supervisor_node(
-            ["claim_decomposition", "claim_classification", "claim_splitter"]
+            ["claim_decomposition", "claim_classification", "claim_splitter"],
+            graph_name="ingestion",
         )
         ingester = StateGraph(State)
         ingester.add_node("supervisor", input_ingestion_node)
@@ -198,9 +210,11 @@ class FactAgent:
 
         def query_generation_node(state: State) -> Command:
             result = self.query_generation_agent.invoke(state)
+            sr = result.get("structured_response", {})
+            self.trace.step("query_generator", sr)
             return Command(
                 update={"messages": [
-                    HumanMessage(content=str(result["structured_response"]["subclaim_with_questions"]),
+                    HumanMessage(content=str(sr.get("subclaim_with_questions")),
                                  name="query_generator"),
                 ]},
                 goto="supervisor",
@@ -208,9 +222,11 @@ class FactAgent:
 
         def evidence_seeking_node(state: State) -> Command:
             result = self.evidence_seeking_agent.invoke(state)
+            sr = result.get("structured_response", {})
+            self.trace.step("evidence_seeker", sr)
             return Command(
                 update={"messages": [
-                    HumanMessage(content=str(result["structured_response"]["subclaims_with_query_evidence"]),
+                    HumanMessage(content=str(sr.get("subclaims_with_query_evidence")),
                                  name="evidence_seeker"),
                 ]},
                 goto="supervisor",
@@ -218,16 +234,21 @@ class FactAgent:
 
         def verdict_prediction_node(state: State) -> Command:
             result = self.verdict_prediction_agent.invoke(state)
+            sr = result.get("structured_response", {})
+            self.trace.step("verdict_predictor", sr)
+            res = sr.get("result") if isinstance(sr.get("result"), dict) else sr
+            self.trace.verdict(res.get("label"), res.get("explanation"))
             return Command(
                 update={"messages": [
-                    HumanMessage(content=str(result["structured_response"]["result"]),
+                    HumanMessage(content=str(sr.get("result")),
                                  name="verdict_predictor"),
                 ]},
                 goto="supervisor",
             )
 
         orchestrator = self._make_supervisor_node(
-            ["input_ingestor", "query_generator", "evidence_seeker", "verdict_predictor"]
+            ["input_ingestor", "query_generator", "evidence_seeker", "verdict_predictor"],
+            graph_name="main",
         )
         super_builder = StateGraph(State)
         super_builder.add_node("supervisor", orchestrator)
@@ -241,15 +262,24 @@ class FactAgent:
     # ------------------------------------------------------------------
     def process_claim(self, claim: str, recursion_limit: int = 200, verbose: bool = False):
         messages = [("user", claim)]
+        # 设置当前 trace 句柄，供 retrieve.py 写入证据链；结束后清除
+        self.trace = tracing.TraceCollector(enabled=self.trace.enabled)
+        tracing.set_current(self.trace)
+        self.trace.claim_start(claim, self.dataset, self.model_name)
         results = []
-        for step in self.super_graph.stream(
-            {"messages": messages},
-            {"recursion_limit": recursion_limit},
-        ):
-            if verbose:
-                print(step)
-                print("---")
-            results.append(step)
+        try:
+            for step in self.super_graph.stream(
+                {"messages": messages},
+                {"recursion_limit": recursion_limit},
+            ):
+                if verbose:
+                    print(step)
+                    print("---")
+                results.append(step)
+        finally:
+            self.trace.claim_end()
+            self.trace.finalize()
+            tracing.set_current(None)
         return results
 
     def process_multiple_claims(self, claims: list, recursion_limit: int = 200, verbose: bool = False):

@@ -5,14 +5,20 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from fastapi import APIRouter, Depends
 
 from src.main.python.api.deps import verify_internal_token
 from src.main.python.api.schemas import (
     ApiResponse,
+    EvidenceItem,
     FactCheckData,
+    FactCheckDetailData,
     FactCheckRequest,
+    FactCheckTrace,
+    TraceRoute,
+    TraceStep,
 )
 from src.main.python.main_agent import FactAgent
 
@@ -103,6 +109,13 @@ def fact_check(req: FactCheckRequest) -> ApiResponse[FactCheckData]:
         verbose=False,
     )
 
+    # 记录 trace 文件路径，便于后端联调按路径取推理过程
+    if agent.trace.trace_file is not None:
+        logging.getLogger("fact_check").info(
+            "trace file: %s | claim: %s",
+            agent.trace.trace_file, req.claim.strip()[:80],
+        )
+
     # 解析结果
     verdict = parse_verdict_from_results(results)
 
@@ -125,3 +138,108 @@ def fact_check(req: FactCheckRequest) -> ApiResponse[FactCheckData]:
         explanation=explanation or "经多智能体系统分析完成事实核查。",
     )
     return ApiResponse[FactCheckData](data=data)
+
+
+# ======================================================================
+# F2 POST /internal/v1/fact-check/detail — 详细版（含推理过程 + 证据链）
+# ======================================================================
+
+
+def _build_detail_response(agent: FactAgent, req: FactCheckRequest) -> FactCheckDetailData:
+    """执行核查并组装详细响应体（含 trace + evidenceItems）。"""
+    results = agent.process_claim(
+        req.claim.strip(),
+        recursion_limit=300,
+        verbose=False,
+    )
+
+    # 记录 trace 文件路径
+    if agent.trace.trace_file is not None:
+        logging.getLogger("fact_check").info(
+            "trace file: %s | claim: %s",
+            agent.trace.trace_file, req.claim.strip()[:80],
+        )
+
+    # ---- 解析 verdict ----
+    verdict = parse_verdict_from_results(results)
+    label = verdict.get("label", "supported")
+    explanation = verdict.get("explanation", "")
+    is_true = label.lower() == "supported"
+    if is_true:
+        conclusion = "声明真实：多个权威来源相互印证。"
+    else:
+        conclusion = "声明虚假：与多方权威信息不符或证据不足。"
+
+    # ---- 从 trace events 构建推理路径 ----
+    events = agent.trace.events
+
+    route = [
+        TraceRoute(graph=e["graph"], next=e["next"])
+        for e in events if e["type"] == "supervisor"
+    ]
+    steps = [
+        TraceStep(node=e["node"], output=e.get("structured_response"))
+        for e in events if e["type"] == "step"
+    ]
+    searches = [
+        EvidenceItem(
+            subclaim="",
+            query=e.get("query", ""),
+            chosenUrl=e.get("chosen_url", ""),
+            evidenceSnippet=e.get("evidence_snippet", ""),
+        )
+        for e in events if e["type"] == "search"
+    ]
+    verdict_event = None
+    for e in events:
+        if e["type"] == "verdict":
+            verdict_event = {"label": e.get("label"), "explanation": e.get("explanation")}
+            break
+
+    trace_data = FactCheckTrace(
+        runId=agent.trace.run_id,
+        claim=agent.trace.claim,
+        route=route,
+        steps=steps,
+        searches=searches,
+        verdict=verdict_event,
+    )
+
+    # ---- 展平证据（把 search 事件的 evidence 映射到 subclaim 上下文） ----
+    # 尝试从 evidence_seeker step 中提取 subclaim → query 映射
+    subclaim_map: dict[str, str] = {}
+    for e in events:
+        if e["type"] == "step" and e["node"] == "evidence_seeker":
+            sr = e.get("structured_response") or {}
+            for item in sr.get("subclaims_with_query_evidence") or []:
+                sc = item.get("subclaim", "")
+                for qe in item.get("queries_with_evidence") or []:
+                    subclaim_map[qe.get("query", "")] = sc
+
+    evidence_items = [
+        EvidenceItem(
+            subclaim=subclaim_map.get(s.query, ""),
+            query=s.query,
+            chosenUrl=s.chosenUrl,
+            evidenceSnippet=s.evidenceSnippet,
+        )
+        for s in searches
+    ]
+
+    return FactCheckDetailData(
+        isTrue=is_true,
+        conclusion=conclusion,
+        explanation=explanation or "经多智能体系统分析完成事实核查。",
+        trace=trace_data,
+        evidenceItems=evidence_items,
+    )
+
+
+@router.post(
+    "/fact-check/detail",
+    response_model=ApiResponse[FactCheckDetailData],
+    summary="事实核查（详细版，含推理过程与证据链）",
+)
+def fact_check_detail(req: FactCheckRequest) -> ApiResponse[FactCheckDetailData]:
+    data = _build_detail_response(get_fact_agent(), req)
+    return ApiResponse[FactCheckDetailData](data=data)
