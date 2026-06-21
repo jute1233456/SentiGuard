@@ -699,9 +699,166 @@ public class Verdict {
 4. **trace.route** 记录 supervisor 路由序列，可用于可视化智能体调用链路
 5. **verdict** 放在 trace 内，与 steps / searches 平级，保持事件完整性
 
+---
+
+## F3. 事实核查（数据库对齐版）
+
+### 基本信息
+- **方法**：`POST`
+- **路径**：`/internal/v1/fact-check/detail/db`
+- **用途**：在 F2 的基础上，返回与 Java 后端数据库表（`fact_claim` / `evidence` / `fact_check_result` / `analysis_report`）直接对齐的结构化 JSON，方便 Java 后端直接反序列化并持久化
+- **同步/异步**：同步
+- **幂等性**：否
+
+### 请求
+
+#### 请求头
+```
+Content-Type: application/json
+X-Internal-Token: <服务间共享密钥>
+X-Trace-Id: <uuid>            （可选）
+```
+
+#### 请求体
+```json
+{
+  "claim": "2024年巴黎奥运会是第33届夏季奥林匹克运动会。"
+}
+```
+
+### 响应
+
+#### 响应体
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "claims": [
+      {
+        "claimOrder": 1,
+        "claimText": "2024年巴黎奥运会是第33届夏季奥林匹克运动会。",
+        "claimType": "verifiable"
+      }
+    ],
+    "evidences": [
+      {
+        "claimOrder": 1,
+        "evidenceTitle": "Paris 2024 - Olympic Games",
+        "evidenceContent": "2024年巴黎奥运会是第33届夏季奥林匹克运动会...",
+        "evidenceUrl": "https://olympics.com/zh/olympic-games/paris-2024",
+        "sourceName": "olympics.com",
+        "evidenceType": "web",
+        "relationType": "support",
+        "credibilityScore": 82,
+        "publishTime": null
+      }
+    ],
+    "result": {
+      "resultLabel": "supported",
+      "confidenceScore": 82,
+      "conclusion": "声明真实：多个权威来源相互印证。",
+      "analysisDetail": "国际奥委会官网与新华社等权威媒体均明确指出...",
+      "supportCount": 1,
+      "attackCount": 0
+    },
+    "report": {
+      "reportTitle": "事实核查报告 — 2024年巴黎奥运会是第33届夏季奥林匹克运动会。",
+      "reportContent": "# 事实核查报告\n\n**核查对象**：...\n\n## 声明拆解\n...\n\n## 证据分析\n...\n\n## 最终结论\n...",
+      "reportFormat": "markdown"
+    }
+  }
+}
+```
+
+### 字段说明
+
+#### data.claims[] 声明列表（对应 `fact_claim` 表）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `claimOrder` | int | 声明顺序号，从 1 递增，Java 端用于关联 evidence |
+| `claimText` | string | 拆解后的可核查声明文本 |
+| `claimType` | string | 声明类型：`verifiable` / `non-verifiable` |
+
+#### data.evidences[] 证据列表（对应 `evidence` 表）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `claimOrder` | int | 关联声明的顺序号（不是数据库 claim_id） |
+| `evidenceTitle` | string | 证据标题，来自搜索结果中的文章标题 |
+| `evidenceContent` | string | 证据摘要或原文片段 |
+| `evidenceUrl` | string | 证据来源链接 |
+| `sourceName` | string | 来源名称或域名 |
+| `evidenceType` | string | 证据类型，固定 `web` |
+| `relationType` | string | 论辩关系：`support` / `attack` / `neutral` |
+| `credibilityScore` | int/null | 可信度评分 0-100 |
+| `publishTime` | string/null | 发布时间（当前版本暂缺，返回 null） |
+
+#### data.result 核查结果（对应 `fact_check_result` 表）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `resultLabel` | string | `supported` / `not_supported` / `insufficient_evidence` |
+| `confidenceScore` | int/null | 置信度评分 0-100 |
+| `conclusion` | string | 面向用户展示的简洁结论 |
+| `analysisDetail` | string | 基于证据的详细分析（取自 LLM 判定解释） |
+| `supportCount` | int | 支持证据数量 |
+| `attackCount` | int | 反驳证据数量 |
+
+#### data.report 分析报告（对应 `analysis_report` 表）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `reportTitle` | string | 报告标题 |
+| `reportContent` | string | 完整 Markdown 格式核查报告 |
+| `reportFormat` | string | 固定 `markdown` |
+
+### 与 F1/F2 的关系
+
+- F3 与 F1、F2 **相互独立**，不共享响应结构，不保证向后兼容
+- F1 仅返回 `isTrue` / `conclusion` / `explanation` 三个字段
+- F2 在 F1 基础上追加推理过程 `trace` + 证据列表 `evidenceItems`
+- F3 完全以数据库表结构为导向设计，返回 `claims` / `evidences` / `result` / `report` 四个结构化数组/对象
+- Java 端可按需调用：只需结论 → F1，需推理过程 → F2，需入库 → F3
+
+### 字段映射说明
+
+| 建议字段 | 实现状态 | 说明 |
+|----------|----------|------|
+| claims[].claimOrder | ✅ 已有 | 从 claim_splitter 输出解析 |
+| claims[].claimText | ✅ 已有 | 来自 claim_splitter 的 subclaims |
+| claims[].claimType | ✅ 已有 | 固定 `verifiable`（已过滤不可核查） |
+| evidences[].claimOrder | ✅ 已有 | 通过 query_generator 的 subclaim 映射 |
+| evidences[].evidenceTitle | ✅ 新增 | 2026-06-21 在 retrieve.py 中追加捕获 |
+| evidences[].evidenceContent | ✅ 已有 | 来自 trace search 事件的 evidence_snippet |
+| evidences[].evidenceUrl | ✅ 已有 | 来自 trace search 事件的 chosen_url |
+| evidences[].sourceName | ✅ 新增 | 2026-06-21 在 retrieve.py 中追加捕获 |
+| evidences[].evidenceType | ✅ 固定值 | 固定返回 `web` |
+| evidences[].relationType | ⚠️ 估算 | 目前基于 verdict label 推断，非逐条判断 |
+| evidences[].credibilityScore | ⚠️ 估算 | 基于证据数量和 verdict 的启发式估算 |
+| evidences[].publishTime | ❌ 暂缺 | 搜索引擎结果中未包含发布时间；返回 null |
+| result.resultLabel | ✅ 已有 | 从 verdict label 映射 |
+| result.confidenceScore | ⚠️ 估算 | 同上 credibilityScore |
+| result.conclusion | ✅ 已有 | 基于 label 生成 |
+| result.analysisDetail | ✅ 已有 | 取自 verdict explanation |
+| result.supportCount | ✅ 已有 | 基于 relationType 计数 |
+| result.attackCount | ✅ 已有 | 基于 relationType 计数 |
+| report.reportTitle | ✅ 生成 | 基于 claim 文本拼接 |
+| report.reportContent | ✅ 生成 | 基于 claims/evidences/verdict 拼接 |
+| report.reportFormat | ✅ 固定值 | 固定 `markdown` |
+
+### 已知限制（后续改进方向）
+
+1. **relationType 是整体推断**：当前基于最终 verdict 为所有证据赋同一 relationType（supported → support，not_supported → attack）。逐条判断需改造 evidence_seeking 节点输出。
+2. **credibilityScore 是启发式估算**：目前基于证据数量和 label 的简单公式，后续可通过 LLM 逐条评估。
+3. **publishTime 暂缺**：搜索结果中不包含发布时间字段，需搜索引擎接口改造。
+4. **reportContent 是模板拼接**：当前通过 Python 字符串模板从 claims / evidences / verdict 拼接而成，未使用 LLM 生成更自然的报告。
+
 | 日期 | 版本 | 变更 |
 |------|------|------|
 | 2026-06-16 | 0.1.0 | 初稿，定义热点列表接口 H1 |
 | 2026-06-16 | 0.2.0 | 新增事实核查接口 F1（简易版，仅返回结论与解释） |
 | 2026-06-16 | 0.2.1 | F1 响应体精简为 `isTrue`(布尔) + `conclusion` + `explanation` 三字段 |
 | 2026-06-21 | 0.3.0 | 新增 F2 POST `/internal/v1/fact-check/detail`（详细版，含推理过程与证据链） |
+| 2026-06-21 | 0.4.0 | 新增 F3 POST `/internal/v1/fact-check/detail/db`（数据库对齐版）；tracing.py 和 retrieve.py 追加 source_title / source_name 字段 |

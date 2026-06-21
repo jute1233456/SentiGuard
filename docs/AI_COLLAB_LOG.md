@@ -781,13 +781,52 @@
 
 ---
 
+## 日志条目 #36 — 数据库对齐版 F3 接口（/internal/v1/fact-check/detail/db）
+
+- **日期**：2026-06-21
+- **场景**：接口设计 / 代码生成 / 文档同步
+- **关键 Prompt**：
+  > "请基于当前 SentiGuard Python FactAgent 的真实能力，重新设计 /internal/v1/fact-check 接口返回结构，使其能够与 Java 后端事实核查数据库表结构对齐。"
+  > "原先接口肯定要保持不变，所有修改只在新的接口上"
+- **需求背景**：Java 后端开发提出需要与数据库表（fact_claim / evidence / fact_check_result / analysis_report）直接对齐的结构化 JSON，便于直接反序列化并持久化，不能只返回 isTrue/conclusion/explanation 三字段。
+- **AI 产出**：
+  - **字段映射分析**：逐一比对 Java 后端建议的 22 个字段 vs Agent 真实能力，标记为 ✅已有 / ✅新增 / ⚠️估算 / ❌暂缺
+  - **`tracing.py` 改造**：`search()` 方法追加 `source_title` 和 `source_name` 参数，保留向后兼容
+  - **`retrieve.py` 改造**：`_retrieve_single()` 在选中证据 URL 时捕获文章标题和来源域名，传给 trace
+  - **`schemas.py` 新增**：`F3ClaimItem`、`F3EvidenceItem`、`F3Result`、`F3Report`、`FactCheckDetailDBData` 五个 Pydantic model，字段名与 Java 数据库表列名对齐（驼峰）
+  - **`fact_check.py` 新增**：`_build_detail_db_response()` 汇编函数 + `fact_check_detail_db()` 路由（`POST /internal/v1/fact-check/detail/db`），包含：
+    - 从 claim_splitter 输出解析 claims 列表
+    - 从 query_generator 建立 query→claimOrder 映射
+    - 从 search events 构建 evidences（含 source_title / source_name）
+    - 基于 verdict label 推算 relationType / credibilityScore
+    - 从 claims/evidences/verdict 拼接 markdown 格式 report
+  - **`app.py`**：版本号更新为 0.4.0
+  - **`docs/api/internal-api.md`**：新增 F3 完整文档（含字段说明、字段映射表、已知限制）
+  - **接口约定**：
+    - F3 与 F1/F2 相互独立，不共享响应结构
+    - claims 中的 claimOrder 从 1 递增
+    - evidence 不带数据库 claim_id（由 Java 入库后生成）
+    - 无真实证据时 evidences 可为空，resultLabel 返回 insufficient_evidence
+    - 字段名固定，方便 Java DTO 反序列化
+- **人工修改**：无
+- **风险控制**：
+  - F3 是新路由，F1/F2 代码完全未动，零回归风险
+  - tracing.search() 新增参数有默认值 `""`，已有调用方不需要修改
+  - retrieve.py 只在选中 URL 处追加了捕获逻辑，不影响原有证据检索流程
+  - 所有估算字段（relationType / credibilityScore）在文档中明确标注为估算
+- **价值**：
+  - Java 后端可直接用 F3 返回体反序列化并写入数据库，无需二次加工
+  - 字段映射表作为后续改进 roadmap，publishTime / 逐条 relationType 等明确标为待办
+
+---
+
 ## 阶段性统计（自动维护，每次新增条目时更新）
 
 | 项 | 值 |
 |----|----|
-| 累计条目数 | 35 |
-| 涉及场景类别 | 代码理解、需求分析、接口设计、代码生成、文档撰写、算法理解、知识 Q&A、版本控制、字段精简、文档代码同步、架构调整、验证测试、交付总结、数据源验证、团队协作、数据源扩展、业务功能、数据采集、代码替换、功能完善、项目维护、配置优化、环境变量管理、向后兼容、Bug 排查、测试用例、接口联调、提示词优化 |
-| 已生成代码文件 | 23（api/*7 + hot_topic/scripts/train_thucnews_improved.py + train_thucnews_simple.py + topic_model_config.py + topic_model_trainer.py + example_usage.py + hot_topic/data_source/rss_client.py + hot_topic/scripts/fetch_recent_news.py + 原hot_topic模块 + retrieve.py重构 + tracing.py + evidence_seeking/query_generation/verdict_prediction prompt改造） |
+| 累计条目数 | 36 |
+| 涉及场景类别 | 代码理解、需求分析、接口设计、代码生成、文档撰写、算法理解、知识 Q&A、版本控制、字段精简、文档代码同步、架构调整、验证测试、交付总结、数据源验证、团队协作、数据源扩展、业务功能、数据采集、代码替换、功能完善、项目维护、配置优化、环境变量管理、向后兼容、Bug 排查、测试用例、接口联调、提示词优化、数据库对齐 |
+| 已生成代码文件 | 26（api/*10 + hot_topic/... + retrieve.py + tracing.py + prompt改造） |
 | 新增核心文件 | 9（tracing.py + 上述 8 个） |
 | 已生成文档文件 | 7（docs/api/internal-api.md、docs/AI_COLLAB_LOG.md、hot_topic/TRAINING_GUIDE.md、README_PYTHON_API.md、THUCNEWS_BERTOPIC_README.md、.env.example、CLAUDE.md） |
 | Git 提交次数 | 8（67eaabd → a3284db → b8e8a8a → b93eb9e → b961c32 → d5fd6c0 → 7d7e299 → 7e6e37e） |
@@ -801,7 +840,7 @@
 | 证据检索 | ✓ Anspire 搜索链路实测打通，端到端 API 实测通过 |
 | Trace 推理路径 | ✓ tracing.py 完成，覆盖 supervisor 路由 + 各节点结构化输出 + 证据链 + verdict |
 | Prompt 改造 | ✓ evidence_seeking（强制搜索+中文+最新）、verdict_prediction（中文）、query_generation（中文） |
-| 已知待办 | verdict 证据衔接准确率（57%）、explanation 字段文本化、Gemini 残留清理（requirements/.env/README/test_search）、远程推送整合 |
+| 已知待办 | verdict 证据衔接准确率（57%）、explanation 字段文本化、Gemini 残留清理（requirements/.env/README/test_search）、远程推送整合、F3 publishTime 字段填充（需搜索引擎改造）、F3 逐条证据 relationType 判断、F3 credibilityScore LLM 逐条评估 |
 
 ---
 

@@ -109,3 +109,51 @@ class FactCheckDetailData(BaseModel):
     explanation: str
     trace: FactCheckTrace
     evidenceItems: List[EvidenceItem] = []
+
+
+# ---------------------------------------------------------------------------
+# F3 POST /internal/v1/fact-check/detail/db — 数据库对齐版
+# ---------------------------------------------------------------------------
+class F3ClaimItem(BaseModel):
+    """单条可核查声明，对应 fact_claim 表"""
+    claimOrder: int = Field(..., ge=1, description="声明顺序，从 1 递增")
+    claimText: str = Field(..., description="拆解后的可核查声明文本")
+    claimType: str = Field(default="verifiable", description="声明类型：verifiable / non-verifiable")
+
+
+class F3EvidenceItem(BaseModel):
+    """单条证据，对应 evidence 表"""
+    claimOrder: int = Field(..., ge=1, description="关联声明的 claimOrder")
+    evidenceTitle: str = Field(default="", description="证据标题")
+    evidenceContent: str = Field(default="", description="证据摘要或原文片段")
+    evidenceUrl: str = Field(default="", description="证据来源链接")
+    sourceName: str = Field(default="", description="来源名称/域名")
+    evidenceType: str = Field(default="web", description="证据类型：web/news/official/model_generated")
+    relationType: str = Field(default="support", description="论辩关系：support/attack/neutral")
+    credibilityScore: Optional[int] = Field(default=None, ge=0, le=100, description="可信度评分 0-100")
+    publishTime: Optional[str] = Field(default=None, description="发布时间，格式 yyyy-MM-dd")
+
+
+class F3Result(BaseModel):
+    """核查结果，对应 fact_check_result 表"""
+    resultLabel: str = Field(default="insufficient_evidence", description="核查标签：supported / not_supported / partly_supported / insufficient_evidence")
+    confidenceScore: Optional[int] = Field(default=None, ge=0, le=100, description="置信度评分 0-100")
+    conclusion: str = Field(default="", description="面向用户展示的简洁核查结论")
+    analysisDetail: str = Field(default="", description="基于证据的简要分析说明")
+    supportCount: int = Field(default=0, ge=0, description="支持证据数量")
+    attackCount: int = Field(default=0, ge=0, description="反驳证据数量")
+
+
+class F3Report(BaseModel):
+    """分析报告，对应 analysis_report 表"""
+    reportTitle: str = Field(default="", description="报告标题")
+    reportContent: str = Field(default="", description="完整 Markdown 格式报告")
+    reportFormat: str = Field(default="markdown", description="报告格式：markdown / html / pdf / docx")
+
+
+class FactCheckDetailDBData(BaseModel):
+    """F3 响应 data — 数据库对齐版，含 claims / evidences / result / report"""
+    claims: List[F3ClaimItem] = []
+    evidences: List[F3EvidenceItem] = []
+    result: F3Result
+    report: F3Report

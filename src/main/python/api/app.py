@@ -19,7 +19,7 @@ from src.main.python.api.routers import fact_check, hotspots
 app = FastAPI(
     title="SentiGuard Internal API",
     description="Spring Boot 后端 ↔ Python FastAPI 智能体服务之间的内部接口",
-    version="0.2.0",
+    version="0.4.0",
 )
 
 app.include_router(hotspots.router)

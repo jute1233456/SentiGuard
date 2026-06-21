@@ -100,13 +100,16 @@ class TraceCollector:
         })
 
     def search(self, query: str, num_results: int,
-               chosen_url: str, evidence_snippet: str) -> None:
+               chosen_url: str, evidence_snippet: str,
+               source_title: str = "", source_name: str = "") -> None:
         self._add({
             "type": "search",
             "query": query,
             "num_results": num_results,
             "chosen_url": chosen_url,
             "evidence_snippet": evidence_snippet,
+            "source_title": source_title,
+            "source_name": source_name,
         })
 
     def verdict(self, label: Optional[str], explanation: Optional[str]) -> None:

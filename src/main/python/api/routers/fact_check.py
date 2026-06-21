@@ -15,8 +15,13 @@ from src.main.python.api.schemas import (
     EvidenceItem,
     FactCheckData,
     FactCheckDetailData,
+    FactCheckDetailDBData,
     FactCheckRequest,
     FactCheckTrace,
+    F3ClaimItem,
+    F3EvidenceItem,
+    F3Report,
+    F3Result,
     TraceRoute,
     TraceStep,
 )
@@ -243,3 +248,202 @@ def _build_detail_response(agent: FactAgent, req: FactCheckRequest) -> FactCheck
 def fact_check_detail(req: FactCheckRequest) -> ApiResponse[FactCheckDetailData]:
     data = _build_detail_response(get_fact_agent(), req)
     return ApiResponse[FactCheckDetailData](data=data)
+
+
+# ======================================================================
+# F3 POST /internal/v1/fact-check/detail/db — 数据库对齐版
+# ======================================================================
+
+
+def _infer_relation_type(label: str, evidence_count: int) -> str:
+    """根据总体标签推断 evidence 的 relationType 默认值。"""
+    if label == "supported":
+        return "support"
+    elif label == "not_supported":
+        return "attack"
+    return "neutral"
+
+
+def _build_credibility_score(evidence_count: int, verdict_label: str) -> Optional[int]:
+    """基于证据数量和判定结果估算可信度分数。"""
+    if evidence_count == 0:
+        return None
+    base = 60
+    if verdict_label == "supported":
+        base += 20
+    elif verdict_label == "not_supported":
+        base += 15
+    if evidence_count >= 3:
+        base += 10
+    elif evidence_count >= 2:
+        base += 5
+    return min(base, 100)
+
+
+def _extract_claims_from_trace(events: list) -> list:
+    """从 trace events 中提取所有可核查声明列表。"""
+    claims = []
+    seen = set()
+    claim_order = 0
+    for e in events:
+        if e["type"] == "step" and e["node"] == "claim_splitter":
+            sr = e.get("structured_response") or {}
+            for sc in sr.get("subclaims") or []:
+                text = sc.strip()
+                if text and text not in seen:
+                    seen.add(text)
+                    claim_order += 1
+                    claims.append(F3ClaimItem(
+                        claimOrder=claim_order,
+                        claimText=text,
+                        claimType="verifiable",
+                    ))
+            break  # 只取 claim_splitter 的结果
+    return claims
+
+
+def _build_detail_db_response(agent: FactAgent, req: FactCheckRequest) -> FactCheckDetailDBData:
+    """执行核查并组装数据库对齐版响应体。"""
+    results = agent.process_claim(
+        req.claim.strip(),
+        recursion_limit=300,
+        verbose=False,
+    )
+
+    # 记录 trace 文件路径
+    if agent.trace.trace_file is not None:
+        logging.getLogger("fact_check").info(
+            "trace file: %s | claim: %s",
+            agent.trace.trace_file, req.claim.strip()[:80],
+        )
+
+    events = agent.trace.events
+
+    # ---- 1. 解析 verdict ----
+    verdict = parse_verdict_from_results(results)
+    label = verdict.get("label", "insufficient_evidence")
+    explanation = verdict.get("explanation", "")
+
+    # ---- 2. 构建 claims ----
+    claims = _extract_claims_from_trace(events)
+
+    # ---- 3. 构建 evidences ----
+    # 建立 query → claimOrder 映射
+    query_to_claim_order: dict[str, int] = {}
+    for e in events:
+        if e["type"] == "step" and e["node"] == "query_generator":
+            sr = e.get("structured_response") or {}
+            for item in sr.get("subclaim_with_questions") or []:
+                sc_text = item.get("subclaim", "").strip()
+                # 找到这个 subclaim 对应的 claimOrder
+                co = None
+                for c in claims:
+                    if c.claimText == sc_text:
+                        co = c.claimOrder
+                        break
+                if co is None:
+                    continue
+                for q in item.get("questions") or []:
+                    query_to_claim_order[q] = co
+            break
+
+    default_relation = _infer_relation_type(label, len([e for e in events if e["type"] == "search"]))
+    support_count = 0
+    attack_count = 0
+
+    evidence_items: list[F3EvidenceItem] = []
+    for e in events:
+        if e["type"] == "search":
+            query = e.get("query", "")
+            co = query_to_claim_order.get(query, 1)
+            relation = default_relation
+            if relation == "support":
+                support_count += 1
+            elif relation == "attack":
+                attack_count += 1
+
+            evidence_items.append(F3EvidenceItem(
+                claimOrder=co,
+                evidenceTitle=e.get("source_title", ""),
+                evidenceContent=e.get("evidence_snippet", ""),
+                evidenceUrl=e.get("chosen_url", ""),
+                sourceName=e.get("source_name", ""),
+                evidenceType="web",
+                relationType=relation,
+                credibilityScore=None,
+                publishTime=None,
+            ))
+
+    # ---- 4. 构建 result ----
+    is_true = label.lower() == "supported"
+    if is_true:
+        conclusion = "声明真实：多个权威来源相互印证。"
+    elif label.lower() == "not_supported":
+        conclusion = "声明虚假：与多方权威信息不符。"
+    else:
+        conclusion = "证据不足以判定声明真伪。"
+
+    credibility = _build_credibility_score(len(evidence_items), label)
+
+    # 将 verdict 的 label 映射到更丰富的标签体系
+    if label.lower() == "supported":
+        result_label = "supported"
+    elif label.lower() == "not_supported":
+        result_label = "not_supported"
+    else:
+        result_label = "insufficient_evidence"
+
+    f3_result = F3Result(
+        resultLabel=result_label,
+        confidenceScore=credibility,
+        conclusion=conclusion,
+        analysisDetail=explanation or "经多智能体系统分析完成事实核查。",
+        supportCount=support_count,
+        attackCount=attack_count,
+    )
+
+    # ---- 5. 构建 report ----
+    report_lines = []
+    report_lines.append(f"# 事实核查报告\n")
+    report_lines.append(f"**核查对象**：{req.claim.strip()}\n")
+    report_lines.append(f"**核查结论**：{conclusion}\n")
+    report_lines.append(f"**置信度**：{credibility if credibility else 'N/A'}/100\n")
+    report_lines.append("---\n")
+    report_lines.append("## 声明拆解\n")
+    for c in claims:
+        report_lines.append(f"- **声明 {c.claimOrder}**：{c.claimText}\n")
+    report_lines.append("\n## 证据分析\n")
+    for ev in evidence_items:
+        report_lines.append(f"- **声明 {ev.claimOrder}** 相关证据：\n")
+        report_lines.append(f"  - 标题：{ev.evidenceTitle}\n")
+        report_lines.append(f"  - 来源：{ev.sourceName}\n")
+        report_lines.append(f"  - 链接：{ev.evidenceUrl}\n")
+        report_lines.append(f"  - 摘要：{ev.evidenceContent}\n")
+        report_lines.append(f"  - 关系：{ev.relationType}\n")
+    if not evidence_items:
+        report_lines.append("（未检索到有效证据）\n")
+    report_lines.append("\n## 最终结论\n")
+    report_lines.append(f"{explanation}\n")
+
+    f3_report = F3Report(
+        reportTitle=f"事实核查报告 — {req.claim.strip()[:50]}",
+        reportContent="".join(report_lines),
+        reportFormat="markdown",
+    )
+
+    return FactCheckDetailDBData(
+        claims=claims,
+        evidences=evidence_items,
+        result=f3_result,
+        report=f3_report,
+    )
+
+
+@router.post(
+    "/fact-check/detail/db",
+    response_model=ApiResponse[FactCheckDetailDBData],
+    summary="事实核查（数据库对齐版，含声明/证据/结果/报告结构化数据）",
+)
+def fact_check_detail_db(req: FactCheckRequest) -> ApiResponse[FactCheckDetailDBData]:
+    data = _build_detail_db_response(get_fact_agent(), req)
+    return ApiResponse[FactCheckDetailDBData](data=data)

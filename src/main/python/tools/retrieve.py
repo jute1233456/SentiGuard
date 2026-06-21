@@ -179,6 +179,8 @@ class SearchEngineRetriever:
                 trace.search(search_query, 0, "", "")
             return retrieved_doc
 
+        chosen_title = ""
+        chosen_source_name = ""
         for i, rd in enumerate(search_server_resp):
             link_choosen = -1
             original_url = self._get_original_url(rd.get("link", ""))
@@ -194,14 +196,19 @@ class SearchEngineRetriever:
                     retrieved_doc = self._process_content(search_query, article_content)
                 if retrieved_doc:
                     chosen_url = url
+                    chosen_title = title
+                    chosen_source_name = self._get_original_url(url).rstrip("/")
                     break
             if link_choosen != -1:
-                article_content = f"Article Title: {search_server_resp[link_choosen].get('title', '')} \nGoogle Snippet: {search_server_resp[link_choosen].get('snippet', ' ')}"
+                chosen_title = search_server_resp[link_choosen].get('title', '')
+                chosen_source_name = self._get_original_url(search_server_resp[link_choosen].get('link', '')).rstrip("/")
+                article_content = f"Article Title: {chosen_title} \nGoogle Snippet: {search_server_resp[link_choosen].get('snippet', ' ')}"
                 retrieved_doc = self._process_content(search_query, article_content)
                 chosen_url = search_server_resp[link_choosen].get('link', '')
 
         if trace:
-            trace.search(search_query, len(search_server_resp), chosen_url, retrieved_doc)
+            trace.search(search_query, len(search_server_resp), chosen_url, retrieved_doc,
+                         source_title=chosen_title, source_name=chosen_source_name)
 
         return retrieved_doc
 
