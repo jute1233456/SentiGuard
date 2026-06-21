@@ -650,23 +650,125 @@
 
 ---
 
+### 条目 #30 — CLAUDE.md 项目指引初始化
+
+- **日期**：2026-06-21
+- **场景**：文档撰写 / 项目理解
+- **关键 Prompt**：
+  > "/init" （分析代码库并生成 CLAUDE.md）
+- **AI 产出**：
+  - 通读 src/main/python（main_agent、llms、tools、experiments、api）、backend（Spring Boot）、hot_topic、docs/AI_COLLAB_LOG.md、README、.env.example
+  - 生成 `CLAUDE.md`，覆盖：两层架构（Python 智能体层 + Java 业务层）、常用命令、6 大架构要点（双层 Supervisor 图 / LLM 开闭原则 / 证据检索注册表 / 实验基线 / 热点挖掘 / 统一响应体）、环境变量、工作约定（AI 协作日志维护、接口四处同步、.gitignore）
+- **人工修改**：
+  - 追加「开发过程中及时更新 AI 辅助编程日志」的强调
+  - 后续按本次会话实际改动同步修正 CLAUDE.md 中「Google Gemini 抽取」的过时描述
+- **风险控制**：聚焦跨多文件才能理解的"大图"，不罗列可自行发现的文件清单，不加通用开发建议
+- **价值**：为后续 AI 协作建立项目心智模型，新会话可快速进入状态
+
+---
+
+### 条目 #31 — 排查事实核查网络搜索（确认走基类 + Anspire 实测）
+
+- **日期**：2026-06-21
+- **场景**：代码理解 / 验证测试 / Bug 排查
+- **关键 Prompt**：
+  > "注意一下项目中，事实核查的网络搜索部分，是否是严格调用基类的搜索方法（符合开闭原则），然后再测试一下这使用 anspire 能否正常进行搜查功能，之前测试都显示搜不到任何信息"
+- **AI 产出**：
+  - 通读 `search_base.py`（BaseSearchEngine + SearchEngineRegistry）、`search_anspire.py`、`retrieve.py`
+  - 确认 `SearchEngineRetriever` 通过注册表 `get_search_engine(available[0])` 取引擎、调基类 `search()`，**符合开闭原则**，未硬编码 Anspire
+  - 本地直接调 `engine.search('中国')` 实测：Anspire 返回 10 条结果，title/url/snippet 均有值——**引擎本身工作正常**，"搜不到信息"问题不在引擎
+  - 定位真正瓶颈在 `retrieve.py` 下游：`_check_valid_url` 四重 URL 合法性过滤 + Selenium 抓正文，可能过滤掉大量结果
+- **人工修改**：无（仅诊断，未改代码）
+- **风险控制**：先实测确认引擎正常，再定位下游断点，避免误改正常代码
+- **价值**：排除"引擎坏了"的误判，把排查方向收敛到 retrieve.py 的过滤/抓取环节
+
+---
+
+### 条目 #32 — 移除硬编码 Gemini，证据检索改走 LLM 抽象层
+
+- **日期**：2026-06-21
+- **场景**：代码重构 / 架构调整
+- **关键 Prompt**：
+  > "代码中有google的ai调用？我们暂时用不到gemini，而且使用ai来对话也需要开闭原则，只调用llm基类才对，我们的模型暂时都是使用的doubao才对"
+  > "使用什么模型需要再类的构造函数指定，默认使用豆包子类，apikey什么的都在llm子类里实现，这里不用该有这样的逻辑"
+- **AI 产出**：
+  - 第一版：`retrieve.py` 顶部删 `import google.generativeai` / `GOOGLE_API_KEY` / `genai.configure` / `GEMINI_MODEL`，`_process_content` 改用 `get_llm_provider(...).chat()` 走工厂
+  - 第二版（按人工反馈收敛职责）：进一步去掉工厂调用与 `_CONTENT_EXTRACT_MODEL` 环境变量；`SearchEngineRetriever.__init__` 改为接收 `llm: Optional[BaseLLM]` 参数，不传则默认构造 `DoubaoLLM()`；`_process_content` 只调 `self.llm.chat(prompt, temperature=0.1)`
+  - 模型选择 + API Key 解析全部收敛到 LLM 子类（DoubaoLLM 内部解析 DOUBAO_API_KEY/ARK_API_KEY），retrieve.py 不再触碰这些细节
+  - 验证：源码无 `genai/gemini/GEMINI/get_llm_provider/GOOGLE_API_KEY` 残留；import 干净
+- **人工修改**：
+  - 否决第一版"在 retrieve.py 里用工厂+环境变量选模型"的方案，明确要求模型与 key 逻辑归 LLM 子类，retrieve.py 只持有实例
+- **风险控制**：
+  - 严格遵循开闭原则，切换厂商时调用方换注入的子类即可，retrieve.py 无需改动
+  - 入口 `search_retrieve_news` 仍构造 `SearchEngineRetriever(dataset)`，走默认豆包分支，向后兼容
+  - 改动仅限 retrieve.py，未碰 backend/（Java 由他人负责）
+- **价值**：消除 Gemini 弃用告警；证据抽取与主流程同源用豆包；职责划分清晰，符合"只调 LLM 基类"约定
+
+---
+
+### 条目 #33 — FactAgent 测试用例扩充与端到端 API 实测
+
+- **日期**：2026-06-21
+- **场景**：测试用例 / 验证测试 / 接口联调
+- **关键 Prompt**：
+  > "用这个（test_factagent.py），不过你需要先修改这个测试程序，加入一些比较新的测试案例，比如北大鹅腿阿姨买的是不是假货"
+  > "咱们先更新api接口吧，因为代码改动了可能调用需要修改" → 实测 fact-check 端点
+- **AI 产出**：
+  - `test_factagent.py` 新增 5 条近期热点用例（鹅腿阿姨走红/卖假货、2024 诺奖化学奖、嫦娥六号、5G 传新冠谣言），共 7 条
+  - 用指定解释器 `E:/develop/env/agent/python.exe` 跑测试：7 条准确率 57.1%（4 对 3 错）；**Anspire 搜索链路完全打通**，每条都搜到 9~10 条结果，豆包内容抽取正常
+  - 发现真瓶颈：3 个 supported 真命题被判 not_supported（如嫦娥六号明明搜到权威正文却称"no retrieved evidence"），问题在 evidence_seeker→verdict_predictor 的证据衔接，非搜索问题
+  - 起 FastAPI 服务端到端实测 `/internal/v1/fact-check`：鉴权(401)→统一响应体→FactAgent 单例→完整多智能体流程→结果解析映射全部通过；维C防坏血病用例返回 `isTrue:true`，证据被正确引用
+  - 发现小瑕疵：`explanation` 字段塞了 verdict dict 的 str()（`{'label':...}`），非纯文本（未改，待人工定夺）
+- **人工修改**：无
+- **风险控制**：
+  - 用 UTF-8 文件传 curl body，规避 Windows shell 中文编码导致 JSON 解析失败
+  - 测试覆盖真/假/难判定三类，含同主题一真一假对照（鹅腿阿姨）检验区分能力
+  - 端到端验证证明 retrieve.py 去 Gemini 重构在真实 API 路径下工作正常
+- **价值**：
+  - 确认"搜不到信息"问题已不存在，搜索链路重构后端到端可用
+  - 暴露并定位真正瓶颈（证据→判定衔接），为后续提升准确率指明方向
+  - API 层经实测确认无需改动即可正常工作
+
+---
+
+### 条目 #34 — Git 提交与推送受阻
+
+- **日期**：2026-06-21
+- **场景**：版本控制 / 团队协作
+- **关键 Prompt**：
+  > "git提交" → "推送到仓库"
+- **AI 产出**：
+  - 删除测试临时文件 `.tmp_factcheck_body.json`，避免入库
+  - 暂存 CLAUDE.md + retrieve.py + test_factagent.py + experiments/__init__.py，commit `7e6e37e`（4 文件 +173/-11）
+  - `git push` 被拒：远程 main 有同学新提交，本地无；`git fetch` 又因 GitHub 连接超时失败
+- **人工修改**：人工选择"先更新 AI 协作日志，推送暂缓"
+- **风险控制**：
+  - 临时测试文件不入库
+  - 推送被拒后不擅自 `--force`，计划用 `pull --rebase` 整合远程改动；若有冲突停下来由人工定夺，不覆盖他人代码
+  - 网络不稳定时不反复轰炸远程
+- **价值**：本地改动已落盘成提交；远程整合待网络恢复后处理
+
+---
+
 ## 阶段性统计（自动维护，每次新增条目时更新）
 
 | 项 | 值 |
 |----|----|
-| 累计条目数 | 29 |
-| 涉及场景类别 | 代码理解、需求分析、接口设计、代码生成、文档撰写、算法理解、知识 Q&A、版本控制、字段精简、文档代码同步、架构调整、验证测试、交付总结、数据源验证、团队协作、数据源扩展、业务功能、数据采集、代码替换、功能完善、项目维护、配置优化、环境变量管理、向后兼容 |
-| 已生成代码文件 | 19（api/*7 + hot_topic/scripts/train_thucnews_improved.py + train_thucnews_simple.py + topic_model_config.py + topic_model_trainer.py + example_usage.py + hot_topic/data_source/rss_client.py + hot_topic/scripts/fetch_recent_news.py + 原hot_topic模块） |
-| 新增核心文件 | 7（topic_model_config.py、topic_model_trainer.py、example_usage.py、train_thucnews_improved.py、rss_client.py、fetch_recent_news.py、doubao_client.py改进） |
-| 已生成文档文件 | 6（docs/api/internal-api.md、docs/AI_COLLAB_LOG.md、hot_topic/TRAINING_GUIDE.md、README_PYTHON_API.md、THUCNEWS_BERTOPIC_README.md、.env.example） |
-| Git 提交次数 | 7（67eaabd → a3284db → b8e8a8a → b93eb9e → b961c32 → d5fd6c0 → 7d7e299） |
-| 人工干预次数 | ≥ 10（范围收敛、字段精简×2、算法质疑、提交把关、任务书排除、语言检测修复、GDELT跳过、API Key配置要求、优先级调整） |
+| 累计条目数 | 34 |
+| 涉及场景类别 | 代码理解、需求分析、接口设计、代码生成、文档撰写、算法理解、知识 Q&A、版本控制、字段精简、文档代码同步、架构调整、验证测试、交付总结、数据源验证、团队协作、数据源扩展、业务功能、数据采集、代码替换、功能完善、项目维护、配置优化、环境变量管理、向后兼容、Bug 排查、测试用例、接口联调 |
+| 已生成代码文件 | 20（api/*7 + hot_topic/scripts/train_thucnews_improved.py + train_thucnews_simple.py + topic_model_config.py + topic_model_trainer.py + example_usage.py + hot_topic/data_source/rss_client.py + hot_topic/scripts/fetch_recent_news.py + 原hot_topic模块 + retrieve.py重构） |
+| 新增核心文件 | 8（topic_model_config.py、topic_model_trainer.py、example_usage.py、train_thucnews_improved.py、rss_client.py、fetch_recent_news.py、doubao_client.py改进、CLAUDE.md） |
+| 已生成文档文件 | 7（docs/api/internal-api.md、docs/AI_COLLAB_LOG.md、hot_topic/TRAINING_GUIDE.md、README_PYTHON_API.md、THUCNEWS_BERTOPIC_README.md、.env.example、CLAUDE.md） |
+| Git 提交次数 | 8（67eaabd → a3284db → b8e8a8a → b93eb9e → b961c32 → d5fd6c0 → 7d7e299 → 7e6e37e） |
+| 人工干预次数 | ≥ 14（含本次：CLAUDE.md 追加日志强调、retrieve.py 职责边界否决第一版、推送暂缓） |
 | 训练阶段完成 | small预设测试训练完成 |
 | 支持主题数 | 默认50个，可配置 |
 | 数据源支持 | GDELT、RSS、THUCNews |
 | CSV采集功能 | ✓ 已完成，可一键获取24小时新闻 |
-| 事实核查功能 | ✓ 已接入真实多智能体系统 |
+| 事实核查功能 | ✓ 已接入真实多智能体系统，证据检索走 LLM 抽象层（豆包） |
 | 配置灵活性 | ✓ 支持参数传入、DOUBAO_*、ARK_* 多种配置方式 |
+| 证据检索 | ✓ Anspire 搜索链路实测打通，端到端 API 实测通过 |
+| 已知待办 | verdict 证据衔接准确率（57%）、explanation 字段文本化、Gemini 残留清理（requirements/.env/README/test_search）、远程推送整合 |
 
 ---
 
