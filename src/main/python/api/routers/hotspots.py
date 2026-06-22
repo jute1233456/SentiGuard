@@ -1,9 +1,12 @@
 """H1 GET /internal/v1/hotspots — 热点列表接口（MySQL 数据源）"""
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+
+logger = logging.getLogger(__name__)
 
 from src.main.python.api.deps import verify_internal_token
 from src.main.python.api.schemas import (
@@ -78,12 +81,29 @@ def trigger_collect(
     try:
         pipeline = HotspotPipeline()
         result = pipeline.run(source=source)
+
+        # ── 控制台输出采集简报 ──
+        logger.info(
+            f"📡 热点采集完成 | 来源: {source} | "
+            f"采集 {result['news_collected']} 条 | "
+            f"入库 {result['news_saved']} 条 | "
+            f"发现 {result['hot_events']} 个热点"
+        )
+        for h in result.get("hotspots", []):
+            logger.info(
+                f"  🔥 #{h['rank']} {h['name']} "
+                f"(热度:{h['heat']}, "
+                f"情感:{h['sentiment']['label']}, "
+                f"关联 {h['news_count']} 条新闻)"
+            )
+
         return ApiResponse[dict](
             code=0,
             message=f"采集完成：新增 {result['news_saved']} 条新闻，发现 {result['hot_events']} 个热点",
             data=result,
         )
     except Exception as e:
+        logger.error(f"❌ 热点采集失败: {e}", exc_info=True)
         return ApiResponse[dict](
             code=50001,
             message=f"采集失败: {e}",

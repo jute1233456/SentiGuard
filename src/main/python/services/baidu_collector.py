@@ -2,10 +2,13 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from typing import List
 
 import requests
+
+logger = logging.getLogger(__name__)
 
 HEADERS = {
     "User-Agent": (
@@ -50,9 +53,16 @@ class BaiduCollector:
             resp.raise_for_status()
             items = self._parse_api_json(resp.text)
             if items:
+                logger.info(
+                    f"✅ 百度热搜采集成功 | API JSON 接口 | "
+                    f"共获取 {len(items)} 条热搜"
+                )
+                for item in items[:5]:
+                    logger.info(f"   #{item.rank} {item.title} (热度:{item.heat})")
                 return items
-        except requests.RequestException:
-            pass
+            logger.warning("⚠️ API JSON 接口返回空数据，尝试 HTML 回退方案")
+        except requests.RequestException as e:
+            logger.warning(f"⚠️ API JSON 接口请求失败: {e}，尝试 HTML 回退方案")
 
         # 方式 2: 回退到 HTML 页面解析
         try:
@@ -64,10 +74,18 @@ class BaiduCollector:
             resp.raise_for_status()
             items = self._parse_html(resp.text)
             if items:
+                logger.info(
+                    f"✅ 百度热搜采集成功 | HTML 回退方案 | "
+                    f"共获取 {len(items)} 条热搜"
+                )
+                for item in items[:5]:
+                    logger.info(f"   #{item.rank} {item.title} (热度:{item.heat})")
                 return items
-        except requests.RequestException:
-            pass
+            logger.warning("⚠️ HTML 回退方案也未获取到数据")
+        except requests.RequestException as e:
+            logger.error(f"❌ HTML 回退方案请求也失败: {e}")
 
+        logger.error("❌ 百度热搜采集彻底失败：所有方式均未获取到数据")
         raise RuntimeError("未能从百度热搜获取到任何数据")
 
     def _parse_api_json(self, text: str) -> List[BaiduHotItem]:
