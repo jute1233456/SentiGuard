@@ -16,3 +16,6 @@ from src.main.python.tools.search_base import (
     get_search_engine,
     list_search_engines,
 )
+
+# 搜索服务模块（两种搜索策略）
+from src.main.python.tools import search_service

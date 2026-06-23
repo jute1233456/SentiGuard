@@ -58,10 +58,12 @@
 | 编号 | 方法 | 路径 | 用途 | 状态 |
 |------|------|------|------|------|
 | H1   | GET  | `/internal/v1/hotspots`    | 获取热点列表（按热度排序） | 已定义 |
-| F1   | POST | `/internal/v1/fact-check`  | 事实核查（简易版，只返回结论与解释） | 已定义 |
-| F2   | POST | `/internal/v1/fact-check/detail` | 事实核查（详细版，含推理过程与证据链） | 已定义 |
-| F3   | POST | `/internal/v1/fact-check/detail/db` | 事实核查（数据库对齐版） | 已定义 |
-| F4   | POST | `/internal/v1/fact-check/detail/llm-report` | 事实核查（LLM 叙事报告版，额外消耗一次 LLM 调用） | 新增 |
+| **Q1** | **POST** | **`/internal/v1/fact-check/quick`** | **快速核查（标准 FactAgent，摘要搜索，返回完整结构化数据）** | **推荐** |
+| **D1** | **POST** | **`/internal/v1/fact-check/deep`** | **深度核查（ReflectiveFactAgent，全文搜索+反思循环，LLM HTML 报告）** | **推荐** |
+| F1   | POST | `/internal/v1/fact-check`  | ~~事实核查（简易版，只返回结论与解释）~~ | **废弃**，请使用 /quick |
+| F2   | POST | `/internal/v1/fact-check/detail` | ~~事实核查（详细版，含推理过程与证据链）~~ | **废弃**，请使用 /quick |
+| F3   | POST | `/internal/v1/fact-check/detail/db` | ~~事实核查（数据库对齐版）~~ | **废弃**，请使用 /quick 或 /deep |
+| F4   | POST | `/internal/v1/fact-check/detail/llm-report` | ~~事实核查（LLM 叙事报告版）~~ | **废弃**，请使用 /deep |
 
 ---
 
@@ -294,7 +296,130 @@ public class Distribution {
 
 ---
 
-## F1. 事实核查（简易版）
+## Q1. 快速核查（推荐）
+
+### 基本信息
+- **方法**：`POST`
+- **路径**：`/internal/v1/fact-check/quick`
+- **用途**：使用标准 FactAgent 完成事实核查，摘要搜索速度快，返回完整结构化数据
+- **同步/异步**：同步
+- **幂等性**：否
+
+### 请求
+
+#### 请求头
+```
+Content-Type: application/json
+X-Internal-Token: <服务间共享密钥>
+X-Trace-Id: <uuid>            （可选）
+```
+
+#### 请求体
+```json
+{
+  "claim": "2024年巴黎奥运会是第33届夏季奥林匹克运动会。"
+}
+```
+
+#### 字段说明（请求）
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `claim` | string | 是 | 待核查的声明，长度 1~2000 字 |
+
+### 响应
+
+#### 响应体
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "claims": [
+      {
+        "claimOrder": 1,
+        "claimText": "2024年巴黎奥运会是第33届夏季奥林匹克运动会。",
+        "claimType": "verifiable"
+      }
+    ],
+    "evidences": [
+      {
+        "claimOrder": 1,
+        "evidenceTitle": "Paris 2024 - Olympic Games",
+        "evidenceContent": "2024年巴黎奥运会是第33届夏季奥林匹克运动会...",
+        "evidenceUrl": "https://olympics.com/zh/olympic-games/paris-2024",
+        "sourceName": "olympics.com",
+        "evidenceType": "web",
+        "relationType": "support",
+        "credibilityScore": 82,
+        "publishTime": null
+      }
+    ],
+    "result": {
+      "resultLabel": "supported",
+      "confidenceScore": 82,
+      "conclusion": "声明真实：多个权威来源相互印证。",
+      "analysisDetail": "国际奥委会官网与新华社等权威媒体均明确指出...",
+      "supportCount": 1,
+      "attackCount": 0
+    },
+    "report": {
+      "reportTitle": "事实核查报告",
+      "reportContent": "# 事实核查报告\n\n...",
+      "reportFormat": "markdown"
+    }
+  }
+}
+```
+
+`data` 结构与 F3 完全一致，详见下方 F3 章节的字段说明。
+
+---
+
+## D1. 深度核查（推荐）
+
+### 基本信息
+- **方法**：`POST`
+- **路径**：`/internal/v1/fact-check/deep`
+- **用途**：使用 ReflectiveFactAgent 完成事实核查，含最多 2 轮反思补充搜索 + 全文抓取，返回 LLM 叙事 HTML 报告
+- **同步/异步**：同步
+- **幂等性**：否
+
+### 请求
+
+#### 请求头
+```
+Content-Type: application/json
+X-Internal-Token: <服务间共享密钥>
+X-Trace-Id: <uuid>            （可选）
+```
+
+#### 请求体
+```json
+{
+  "claim": "2024年巴黎奥运会是第33届夏季奥林匹克运动会。"
+}
+```
+
+#### 字段说明（请求）
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `claim` | string | 是 | 待核查的声明，长度 1~2000 字 |
+
+### 响应
+
+响应体结构与 Q1 完全相同（`FactCheckDetailDBData`），区别：
+- `report.reportFormat` = `"html"`（LLM 叙事 HTML 报告）
+- `evidences` 更多（经过反思循环补充搜索）
+- 响应时间更长（约 30s-60s）
+
+---
+
+## F1. 事实核查（简易版）【已废弃】
+
+> **⚠️ 废弃说明**：此接口已废弃，请使用 `POST /internal/v1/fact-check/quick` 替代。
+> 快速核查返回更完整的结构化数据（claims + evidences + result + report），且同样轻量快速。
 
 ### 基本信息
 - **方法**：`POST`
@@ -454,7 +579,9 @@ public class FactCheckData {
 
 ---
 
-## F2. 事实核查（详细版，含推理过程与证据链）
+## F2. 事实核查（详细版，含推理过程与证据链）【已废弃】
+
+> **⚠️ 废弃说明**：此接口已废弃，请使用 `POST /internal/v1/fact-check/quick` 替代。
 
 ### 基本信息
 - **方法**：`POST`
@@ -703,7 +830,10 @@ public class Verdict {
 
 ---
 
-## F3. 事实核查（数据库对齐版）
+## F3. 事实核查（数据库对齐版）【已废弃】
+
+> **⚠️ 废弃说明**：此接口已废弃，请使用 `POST /internal/v1/fact-check/quick` 或 `/deep` 替代。
+> 快速核查和深度核查返回完全相同的 `FactCheckDetailDBData` 结构，Java DTO 无需修改即可切换。
 
 ### 基本信息
 - **方法**：`POST`
@@ -864,3 +994,4 @@ X-Trace-Id: <uuid>            （可选）
 | 2026-06-16 | 0.2.1 | F1 响应体精简为 `isTrue`(布尔) + `conclusion` + `explanation` 三字段 |
 | 2026-06-21 | 0.3.0 | 新增 F2 POST `/internal/v1/fact-check/detail`（详细版，含推理过程与证据链） |
 | 2026-06-21 | 0.4.0 | 新增 F3 POST `/internal/v1/fact-check/detail/db`（数据库对齐版）；tracing.py 和 retrieve.py 追加 source_title / source_name 字段 |
+| 2026-06-23 | 0.5.0 | 新增 Q1 `/fact-check/quick`（快速核查）和 D1 `/fact-check/deep`（深度核查）端点；旧端点 F1/F2/F3/F4 标注废弃 |

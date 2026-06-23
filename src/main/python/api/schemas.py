@@ -62,6 +62,7 @@ class HotspotData(BaseModel):
 class FactCheckRequest(BaseModel):
     claim: str = Field(..., min_length=1, max_length=2000)
     report_style: str = Field(default="simple", description="报告风格：simple（数据驱动Markdown）/ llm（LLM叙事HTML）")
+    reflective: bool = Field(default=False, description="是否启用反思循环模式（ReflectiveFactAgent），默认false，启用后会进行多轮补充搜索")
 
 
 class FactCheckData(BaseModel):

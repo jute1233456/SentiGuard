@@ -984,3 +984,112 @@
 | 本地测试 | ✓ `test_report_html.py`，生成 HTML 文件用浏览器查看 |
 | 人工干预次数 | ≥ 14 |
 | 已知待办 | verdict 证据衔接准确率、F3 publishTime 字段填充（需搜索引擎改造）、F3 逐条证据 relationType 判断、F3 credibilityScore LLM 逐条评估 |
+
+---
+
+### 日志条目 #42 — 搜索引擎优化：search_service 模块收尾
+
+- **日期**：2026-06-23
+- **场景**：代码完善 / 架构优化
+- **关键 Prompt**：
+  > "继续写你之前没写完的代码，就是搜索引擎优化"
+  > "之前是让你做两个搜索功能，一个是简略搜索，一个是摘要搜索。简略搜索只有摘要，详细搜索有全文。你首先实现"
+- **背景**：之前完成了 search_service.py 的基础框架（search_summary 和 search_fulltext 两个策略），但存在几个关键问题需要收尾修复。
+- **AI 产出**：
+
+  **A. SearchEngineRetriever 模块级缓存**
+  - **`search_service.py`**：新增 `_RETRIEVER_CACHE` 字典 + `_get_retriever(dataset)` 函数，按 dataset 名称缓存 SearchEngineRetriever 实例
+  - **问题修复**：`search_fulltext()` 每次调用都创建新的 SearchEngineRetriever → 新建 Selenium WebDriver，既不释放又慢。现在只在首次调用时创建，后续复用缓存实例
+  - **关键改动**：`search_fulltext()` 中 `SearchEngineRetriever(dataset)` 替换为 `_get_retriever(dataset)`
+
+  **B. 返回类型一致性修复**
+  - **`retrieve.py`**：`search_retrieve_news()` 的 `except` 分支原来返回 `""`（空字符串），而正常路径返回 `list[dict]`，类型不一致。修复为统一返回 `[]`
+
+  **C. 搜索引擎兜底策略（fallback chain）**
+  - **`search_service.py`**：`_get_engine()` 从"只取第一个注册引擎"改为"遍历全部注册引擎，找到第一个可用的"
+  - **`retrieve.py`**：`SearchEngineRetriever.__init__` 同步改造，同样的遍历兜底逻辑
+  - 改进前：`available[0]` 不可用时直接返回 None
+  - 改进后：遍历 `[anspire, serper, ...]` 直到找到可用引擎；全部不可用时日志明确输出"共 N 个引擎均不可用"
+
+- **人工修改**：无
+- **风险控制**：
+  - Selenium WebDriver 缓存后，进程级只有一个 Chrome 实例，注意 `__del__` 中 `driver.quit()` 的清理逻辑保持不变
+  - 返回类型 `[]` vs `""` 的改动确认无上游代码对空字符串做 `== ""` 检查（grep 确认）
+  - 引擎遍历兜底不改变既有注册逻辑，新增引擎只需 `register_search_engine`
+- **价值**：
+  - search_fulltext 不再每次调用开新 Chrome 实例，性能提升显著
+  - 注册多个搜索引擎时自动 fallback，提高搜索可用性
+  - 返回类型统一避免上层代码的隐式 bug
+
+---
+
+## 阶段性统计（自动维护，每次新增条目时更新）
+
+| 项 | 值 |
+|----|----|
+| 累计条目数 | 43 |
+| 涉及场景类别 | 代码理解、需求分析、接口设计、代码生成、文档撰写、算法理解、知识 Q&A、版本控制、字段精简、文档代码同步、架构调整、验证测试、交付总结、数据源验证、团队协作、数据源扩展、业务功能、数据采集、代码替换、功能完善、项目维护、配置优化、环境变量管理、向后兼容、Bug 排查、测试用例、接口联调、提示词优化、数据库对齐、日志增强、安全加固、置信度评分、报告模块重构、**LLM 叙事报告**、**Java 接口对接**、**结构化 IR 方案**、**Block-type 分派渲染**、**搜索服务优化**、**接口重构** |
+| 已生成代码文件 | 42（重构 fact_check.py，提取 6 个共享函数） |
+| 新增核心文件 | 29 |
+| 已生成文档文件 | 8 |
+| 报告模块 | ✓ 数据驱动模式 + Markdown 渲染 + ✓ LLM 叙事模式（结构化 IR + 9 种 block 类型渲染 + 降级路径） |
+| 结构化 IR | ✓ 9 种 block 类型（heading/paragraph/list/table/callout/kpiGrid/blockquote/evidenceCard/hr） |
+| Block 渲染 | ✓ callout（4 色调）、evidenceCard（可信度条+论辩标签）、kpiGrid、table、list、blockquote |
+| 置信度评分 | ✓ Veracity 方法：prompt 评分标准 + trace 记录 + 接口输出 |
+| Java 接口 | ✓ F3 保留向后兼容 + ✓ 新增 Q1（quick）+ ✓ 新增 D1（deep），三者返回相同 FactCheckDetailDBData |
+| 搜索服务 | ✓ search_summary（摘要）+ search_fulltext（全文）+ 引擎兜底 + Retriever 缓存 |
+| API 端点 | ✓ `/quick`（快速核查） + ✓ `/deep`（深度核查） + ✓ 旧端点保留但废弃 |
+| 本地测试 | ✓ `test_report_html.py`，生成 HTML 文件用浏览器查看 |
+| 人工干预次数 | ≥ 15 |
+| 已知待办 | verdict 证据衔接准确率、F3 publishTime 字段填充（需搜索引擎改造）、F3 逐条证据 relationType 判断、F3 credibilityScore LLM 逐条评估、快速核查 HTML 报告生成 |
+| Java 接口 | ✓ `report_style` 字段，向后兼容，不传 = 原数据驱动模式 |
+| 搜索服务 | ✓ search_summary（摘要）+ search_fulltext（全文）+ 引擎兜底 + Retriever 缓存 |
+| 本地测试 | ✓ `test_report_html.py`，生成 HTML 文件用浏览器查看 |
+| 人工干预次数 | ≥ 14 |
+| 已知待办 | verdict 证据衔接准确率、F3 publishTime 字段填充（需搜索引擎改造）、F3 逐条证据 relationType 判断、F3 credibilityScore LLM 逐条评估 |
+
+---
+
+### 日志条目 #43 — 事实核查接口重构：quick + deep 两个新端点
+
+- **日期**：2026-06-23
+- **场景**：接口设计 / 代码重构 / 文档更新
+- **关键 Prompt**：
+  > "即便是深度思考，也不能只返回报告，也要和快速核查一样返回结果之类的"
+  > "即便是快速核查也需要返回html的报告，这个先不着急实现，我们先把接口设定好"
+  > "你的第三个接口是做什么的"
+  > "好的，那就按照原计划新增两个接口，快速核查以及深度核查，他们的返回格式是一样的，只是核查的过程不一样。其它接口暂时保留，但是注明废弃。"
+- **背景**：当前 Python FastAPI 有 4 个事实核查端点（F1/F2/F3/LLM），职责划分模糊，reflective 模式通过请求体布尔开关控制不够直观。Java 后端只调用 F3 一个端点。需要两个意图清晰、返回相同结构化数据的端点。
+- **AI 产出**：
+
+  **A. 接口设计**
+  - `POST /internal/v1/fact-check/quick` — **快速核查**：标准 FactAgent + 摘要搜索，返回完整 `FactCheckDetailDBData`
+  - `POST /internal/v1/fact-check/deep` — **深度核查**：ReflectiveFactAgent + 全文搜索 + 反思循环，返回**相同结构** `FactCheckDetailDBData`
+  - **核心原则**：两个端点返回完全相同的数据结构（claims/evidences/result/report），Java DTO 零改动即可切换
+  - 区别仅在内部：quick 用 `search_summary()` 摘要搜索 + 数据驱动报告；deep 用 `search_fulltext()` 全文搜索 + 反思循环 + LLM HTML 报告
+
+  **B. 共享函数提取（消除重复代码）**
+  - `_build_claims_evidences_from_trace()` — 从 trace 提取 claims + evidences
+  - `_build_result_conclusion()` — 根据 label 确定 resultLabel + conclusion（消除 4 处重复）
+  - `_build_report_data_from_f3()` — 构造 ReportModuleData（消除 3 处 f3_like 匿名对象）
+  - `_build_f3_result()` — 构建 F3Result（含 supportCount/attackCount）
+  - `_merge_evidence()` — 合并 trace evidence 与 reflective supplement evidence，按 content+url 去重
+  - `_build_quick_response()` / `_build_deep_response()` — 两个端点处理函数
+
+  **C. 旧端点标注废弃**
+  - F1/F2/F3/LLM 四个旧端点全部保留但标注 `deprecated=True`
+  - F1 内部委托 `_build_quick_response()` 或 `_build_deep_response()`
+  - F2 保持原有 trace 逻辑不变
+  - F3 内部委托 `_build_quick_response()` 或 `_build_deep_response()`（保持 Java 向后兼容）
+  - LLM 报告端点委托 `_build_deep_response()`
+
+- **人工修改**：用户纠正了"深度核查只返回报告"的误解，要求两个端点返回相同结构
+- **风险控制**：
+  - Java 后端调用的 F3 端点完全不动，响应结构不变
+  - 旧端点全部标注 `deprecated` 但保留功能，不破坏现有调用
+  - FastAPI 的 `deprecated=True` 在 OpenAPI 文档中显示为废弃标记
+- **价值**：
+  - 两个新端点意图清晰，前端/后端按需选择
+  - 共享函数消除约 80 行重复代码
+  - 返回结构统一，降低对接成本
+- **待办**：快速核查的 HTML 报告生成（当前 quick 返回 Markdown 报告，需后续实现）

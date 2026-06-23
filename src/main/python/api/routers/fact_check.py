@@ -1,6 +1,15 @@
-﻿"""F1 POST /internal/v1/fact-check — 事实核查（真实实现版）。
+"""事实核查 API 路由。
 
-响应体仅包含三个字段：isTrue / conclusion / explanation。
+端点一览：
+- POST /fact-check/quick       — 快速核查（标准 FactAgent + 摘要搜索）
+- POST /fact-check/deep        — 深度核查（ReflectiveFactAgent + 全文搜索 + 反思循环）
+- POST /fact-check             — [废弃] 简化版，请使用 /quick
+- POST /fact-check/detail      — [废弃] 详细版，请使用 /quick
+- POST /fact-check/detail/db   — [废弃] 数据库对齐版，请使用 /quick 或 /deep
+- POST /fact-check/detail/llm-report — [废弃] LLM 报告版，请使用 /deep
+
+两个新端点（quick / deep）返回完全相同的 FactCheckDetailDBData 结构，
+区别仅在内部核查深度。Java 后端可无缝切换到任一接口。
 """
 from __future__ import annotations
 
@@ -9,6 +18,7 @@ import json
 import logging
 import re
 from datetime import datetime
+from typing import Optional
 from fastapi import APIRouter, Depends
 
 from src.main.python.api.deps import verify_internal_token
@@ -28,6 +38,7 @@ from src.main.python.api.schemas import (
     TraceStep,
 )
 from src.main.python.main_agent import FactAgent
+from src.main.python.reflective_fact_agent import ReflectiveFactAgent
 from src.main.python.report import ReportGenerator, LLMReportGenerator
 from src.main.python.report.models import ReportData as ReportModuleData
 
@@ -39,6 +50,7 @@ router = APIRouter(
 
 # 全局缓存 FactAgent 实例，避免重复初始化
 _fact_agent: FactAgent | None = None
+_reflective_agent: ReflectiveFactAgent | None = None
 
 
 def get_fact_agent() -> FactAgent:
@@ -51,6 +63,23 @@ def get_fact_agent() -> FactAgent:
             temperature=0.2,
         )
     return _fact_agent
+
+
+def get_reflective_agent() -> ReflectiveFactAgent:
+    """获取或初始化 ReflectiveFactAgent 单例"""
+    global _reflective_agent
+    if _reflective_agent is None:
+        _reflective_agent = ReflectiveFactAgent(
+            dataset="fever",
+            model_name="doubao/doubao-seed-2-0-mini-260428",
+            temperature=0.2,
+        )
+    return _reflective_agent
+
+
+# ======================================================================
+# Verdict 解析函数（供所有端点复用）
+# ======================================================================
 
 
 def parse_verdict_from_results(results):
@@ -140,7 +169,6 @@ def _normalize_verdict(verdict):
     }
 
 
-
 def _normalize_score_value(value) -> Optional[int]:
     try:
         if value is None or value == "":
@@ -151,6 +179,8 @@ def _normalize_score_value(value) -> Optional[int]:
         return max(0, min(100, round(number)))
     except (TypeError, ValueError):
         return None
+
+
 def _parse_dict_like_text(text: str) -> dict | None:
     """解析模型可能吐出的 JSON 或 Python dict 字符串。"""
     if not isinstance(text, str):
@@ -168,55 +198,226 @@ def _parse_dict_like_text(text: str) -> dict | None:
     return parsed if isinstance(parsed, dict) else None
 
 
-@router.post(
-    "/fact-check",
-    response_model=ApiResponse[FactCheckData],
-    summary="事实核查（真实实现，调用多智能体系统）",
-)
-def fact_check(req: FactCheckRequest) -> ApiResponse[FactCheckData]:
-    # ----- 真实实现：调用 FactAgent -----
-    agent = get_fact_agent()
+# ======================================================================
+# 共享辅助函数（供 quick / deep / 旧端点复用）
+# ======================================================================
 
-    # 执行事实核查
+
+def _build_claims_evidences_from_trace(events: list, claim_text: str, label: str):
+    """从 trace events 提取 claims 和 evidence items。"""
+    claims = _extract_claims_from_trace(events, claim_text)
+    evidence_items = _extract_evidence_items_from_trace(events, claims, label)
+    return claims, evidence_items
+
+
+def _build_result_conclusion(label: str, evidence_items: list):
+    """根据 label 确定 resultLabel 和 conclusion。"""
+    if label.lower() == "supported":
+        return "supported", "声明真实：多个权威来源相互印证。"
+    elif label.lower() == "not_supported":
+        if not evidence_items:
+            return "insufficient_evidence", "证据不足以判定声明真伪。"
+        return "not_supported", "声明虚假：与多方权威信息不符。"
+    return "insufficient_evidence", "证据不足以判定声明真伪。"
+
+
+def _build_report_data_from_f3(claims, evidence_items, f3_result, trace, claim_text: str):
+    """从 F3 结构化数据构造 ReportModuleData。"""
+    f3_like = type("F3Like", (), {})()
+    f3_like.claims = claims
+    f3_like.evidences = evidence_items
+    f3_like.result = f3_result
+    report_data = ReportModuleData.from_f3_data(
+        f3_like,
+        run_id=trace.run_id if trace else "",
+        generated_at=datetime.now().isoformat(timespec="seconds"),
+    )
+    report_data.claim = claim_text
+    return report_data
+
+
+def _merge_evidence(trace_evidence: list, reflective_evidence: list) -> list:
+    """合并 trace evidence 与 reflective supplement evidence，按 content+url 去重。"""
+    seen = set()
+    merged = []
+    for ev in trace_evidence:
+        key = (ev.evidenceContent, ev.evidenceUrl)
+        if key not in seen:
+            seen.add(key)
+            merged.append(ev)
+    for ev in reflective_evidence:
+        content = getattr(ev, "evidenceContent", "") or ""
+        url = getattr(ev, "evidenceUrl", "") or ""
+        key = (content, url)
+        if key not in seen:
+            seen.add(key)
+            merged.append(ev)
+    return merged
+
+
+def _build_f3_result(label: str, explanation: str, confidence_score, evidence_items: list) -> F3Result:
+    """构建 F3Result（含 resultLabel、conclusion、supportCount、attackCount）。"""
+    result_label, conclusion = _build_result_conclusion(label, evidence_items)
+    support_count = sum(1 for ev in evidence_items if ev.relationType == "support")
+    attack_count = sum(1 for ev in evidence_items if ev.relationType == "attack")
+    return F3Result(
+        resultLabel=result_label,
+        confidenceScore=confidence_score,
+        conclusion=conclusion,
+        analysisDetail=explanation or "经多智能体系统分析完成事实核查。",
+        supportCount=support_count,
+        attackCount=attack_count,
+    )
+
+
+# ======================================================================
+# 快速核查 — POST /internal/v1/fact-check/quick
+# ======================================================================
+
+
+def _build_quick_response(agent: FactAgent, req: FactCheckRequest) -> FactCheckDetailDBData:
+    """快速核查：标准 FactAgent + 摘要搜索 + 数据驱动 Markdown 报告。"""
     results = agent.process_claim(
         req.claim.strip(),
         recursion_limit=300,
         verbose=False,
     )
-
-    # 记录 trace 文件路径，便于后端联调按路径取推理过程
     if agent.trace.trace_file is not None:
         logging.getLogger("fact_check").info(
             "trace file: %s | claim: %s",
             agent.trace.trace_file, req.claim.strip()[:80],
         )
 
-    # 解析结果
+    events = agent.trace.events
     verdict = parse_verdict_from_results(results)
-
-    # 映射到接口格式
-    label = verdict.get("label", "supported")
+    label = verdict.get("label", "insufficient_evidence")
     explanation = verdict.get("explanation", "")
+    confidence_score = verdict.get("confidenceScore")
 
-    # supported → isTrue=True, not_supported → isTrue=False
-    is_true = label.lower() == "supported"
+    claims, evidence_items = _build_claims_evidences_from_trace(events, req.claim.strip(), label)
+    f3_result = _build_f3_result(label, explanation, confidence_score, evidence_items)
 
-    # 生成结论文本
-    if is_true:
-        conclusion = "声明真实：多个权威来源相互印证。"
+    # 数据驱动 Markdown 报告
+    report_data = _build_report_data_from_f3(claims, evidence_items, f3_result, agent.trace, req.claim.strip())
+    report_result = ReportGenerator(report_data).generate()
+    f3_report = F3Report(
+        reportTitle=report_result.title,
+        reportContent=report_result.content,
+        reportFormat="markdown",
+    )
+
+    return FactCheckDetailDBData(
+        claims=claims,
+        evidences=evidence_items,
+        result=f3_result,
+        report=f3_report,
+    )
+
+
+@router.post(
+    "/fact-check/quick",
+    response_model=ApiResponse[FactCheckDetailDBData],
+    summary="快速核查（标准 FactAgent，摘要搜索，数据驱动报告）",
+)
+def fact_check_quick(req: FactCheckRequest) -> ApiResponse[FactCheckDetailDBData]:
+    """快速核查：使用标准 FactAgent 完成事实核查，摘要搜索速度快，返回完整结构化数据。"""
+    data = _build_quick_response(get_fact_agent(), req)
+    return ApiResponse[FactCheckDetailDBData](data=data)
+
+
+# ======================================================================
+# 深度核查 — POST /internal/v1/fact-check/deep
+# ======================================================================
+
+
+def _build_deep_response(reflective_agent: ReflectiveFactAgent, req: FactCheckRequest) -> FactCheckDetailDBData:
+    """深度核查：ReflectiveFactAgent + 全文搜索 + 反思循环 + LLM HTML 报告。"""
+    ref_result = reflective_agent.process_claim(
+        req.claim.strip(),
+        recursion_limit=300,
+        verbose=False,
+    )
+
+    verdict = ref_result["final_verdict"]
+    label = verdict.get("label", "insufficient_evidence")
+    explanation = verdict.get("explanation", "")
+    confidence_score = verdict.get("confidenceScore")
+
+    # 从 trace 提取 claims + 基础 evidence
+    events = reflective_agent.trace.events
+    claims, trace_evidence = _build_claims_evidences_from_trace(events, req.claim.strip(), label)
+
+    # 合并反思补充的证据
+    all_evidence_items = _merge_evidence(trace_evidence, ref_result.get("all_evidences", []))
+    f3_result = _build_f3_result(label, explanation, confidence_score, all_evidence_items)
+
+    # LLM HTML 报告（失败降级为 Markdown）
+    report_data = _build_report_data_from_f3(claims, all_evidence_items, f3_result, reflective_agent.trace, req.claim.strip())
+    try:
+        report_result = LLMReportGenerator(report_data).generate(renderer_name="html")
+        report_format = "html"
+    except Exception:
+        logging.getLogger("fact_check").warning("LLM 报告生成失败，降级为数据驱动模式", exc_info=True)
+        report_result = ReportGenerator(report_data).generate()
+        report_format = "markdown"
+
+    f3_report = F3Report(
+        reportTitle=report_result.title,
+        reportContent=report_result.content,
+        reportFormat=report_format,
+    )
+
+    return FactCheckDetailDBData(
+        claims=claims,
+        evidences=all_evidence_items,
+        result=f3_result,
+        report=f3_report,
+    )
+
+
+@router.post(
+    "/fact-check/deep",
+    response_model=ApiResponse[FactCheckDetailDBData],
+    summary="深度核查（ReflectiveFactAgent，全文搜索，反思循环，LLM 叙事报告）",
+)
+def fact_check_deep(req: FactCheckRequest) -> ApiResponse[FactCheckDetailDBData]:
+    """深度核查：使用 ReflectiveFactAgent 完成事实核查，含最多 2 轮反思补充搜索，返回完整结构化数据。"""
+    data = _build_deep_response(get_reflective_agent(), req)
+    return ApiResponse[FactCheckDetailDBData](data=data)
+
+
+# ======================================================================
+# [废弃] F1 POST /internal/v1/fact-check — 简化版
+# ======================================================================
+
+
+@router.post(
+    "/fact-check",
+    response_model=ApiResponse[FactCheckData],
+    summary="[废弃] 事实核查简化版，请使用 /quick",
+    deprecated=True,
+)
+def fact_check(req: FactCheckRequest) -> ApiResponse[FactCheckData]:
+    """[废弃] 简化版，仅返回 isTrue/conclusion/explanation 三字段。
+
+    请使用 POST /internal/v1/fact-check/quick 替代，返回完整的结构化数据。
+    """
+    if req.reflective:
+        db_data = _build_deep_response(get_reflective_agent(), req)
     else:
-        conclusion = "声明虚假：与多方权威信息不符或证据不足。"
+        db_data = _build_quick_response(get_fact_agent(), req)
 
+    is_true = db_data.result.resultLabel == "supported"
     data = FactCheckData(
         isTrue=is_true,
-        conclusion=conclusion,
-        explanation=explanation or "经多智能体系统分析完成事实核查。",
+        conclusion=db_data.result.conclusion,
+        explanation=db_data.result.analysisDetail,
     )
     return ApiResponse[FactCheckData](data=data)
 
 
 # ======================================================================
-# F2 POST /internal/v1/fact-check/detail — 详细版（含推理过程 + 证据链）
+# [废弃] F2 POST /internal/v1/fact-check/detail — 详细版（含推理过程 + 证据链）
 # ======================================================================
 
 
@@ -228,14 +429,12 @@ def _build_detail_response(agent: FactAgent, req: FactCheckRequest) -> FactCheck
         verbose=False,
     )
 
-    # 记录 trace 文件路径
     if agent.trace.trace_file is not None:
         logging.getLogger("fact_check").info(
             "trace file: %s | claim: %s",
             agent.trace.trace_file, req.claim.strip()[:80],
         )
 
-    # ---- 解析 verdict ----
     verdict = parse_verdict_from_results(results)
     label = verdict.get("label", "supported")
     explanation = verdict.get("explanation", "")
@@ -245,7 +444,6 @@ def _build_detail_response(agent: FactAgent, req: FactCheckRequest) -> FactCheck
     else:
         conclusion = "声明虚假：与多方权威信息不符或证据不足。"
 
-    # ---- 从 trace events 构建推理路径 ----
     events = agent.trace.events
 
     route = [
@@ -280,8 +478,6 @@ def _build_detail_response(agent: FactAgent, req: FactCheckRequest) -> FactCheck
         verdict=verdict_event,
     )
 
-    # ---- 展平证据（把 search 事件的 evidence 映射到 subclaim 上下文） ----
-    # 尝试从 evidence_seeker step 中提取 subclaim → query 映射
     subclaim_map: dict[str, str] = {}
     for e in events:
         if e["type"] == "step" and e["node"] == "evidence_seeker":
@@ -313,15 +509,20 @@ def _build_detail_response(agent: FactAgent, req: FactCheckRequest) -> FactCheck
 @router.post(
     "/fact-check/detail",
     response_model=ApiResponse[FactCheckDetailData],
-    summary="事实核查（详细版，含推理过程与证据链）",
+    summary="[废弃] 详细版（含推理过程与证据链），请使用 /quick",
+    deprecated=True,
 )
 def fact_check_detail(req: FactCheckRequest) -> ApiResponse[FactCheckDetailData]:
+    """[废弃] 详细版，含推理路径和证据链。
+
+    请使用 POST /internal/v1/fact-check/quick 替代，返回更完整的结构化数据。
+    """
     data = _build_detail_response(get_fact_agent(), req)
     return ApiResponse[FactCheckDetailData](data=data)
 
 
 # ======================================================================
-# F3 POST /internal/v1/fact-check/detail/db — 数据库对齐版
+# [废弃] F3 POST /internal/v1/fact-check/detail/db — 数据库对齐版
 # ======================================================================
 
 
@@ -332,8 +533,6 @@ def _infer_relation_type(label: str, evidence_count: int) -> str:
     elif label == "not_supported":
         return "attack"
     return "neutral"
-
-
 
 
 def _extract_claims_from_trace(events: list, fallback_claim: str = "") -> list:
@@ -407,7 +606,6 @@ def _extract_claims_from_trace(events: list, fallback_claim: str = "") -> list:
                 supplement_from_original()
                 return claims
 
-    # 有些运行路径会跳过 splitter/classification，直接由 query_generator 产出 subclaim
     for e in events:
         if e.get("type") == "step" and e.get("node") == "query_generator":
             sr = e.get("structured_response") or {}
@@ -418,7 +616,6 @@ def _extract_claims_from_trace(events: list, fallback_claim: str = "") -> list:
                 supplement_from_original()
                 return claims
 
-    # 再兜底到 evidence_seeker，确保实际被检索的 subclaim 能写入数据库
     for e in events:
         if e.get("type") == "step" and e.get("node") == "evidence_seeker":
             sr = e.get("structured_response") or {}
@@ -431,6 +628,7 @@ def _extract_claims_from_trace(events: list, fallback_claim: str = "") -> list:
 
     add_claim(fallback_claim, "verifiable")
     return claims
+
 
 def _claim_order_for_text(claims: list, text: str) -> int:
     value = str(text or "").strip()
@@ -457,7 +655,6 @@ def _valid_evidence_text(text: str) -> bool:
 
 
 def _infer_evidence_relation(subclaim: str, evidence_text: str, fallback_label: str) -> str:
-    """尽量按单条声明和证据内容判断 support/attack/neutral。"""
     claim = str(subclaim or "")
     evidence = str(evidence_text or "")
     combined = claim + "\n" + evidence
@@ -469,7 +666,6 @@ def _infer_evidence_relation(subclaim: str, evidence_text: str, fallback_label: 
     if any(marker in combined for marker in support_markers):
         return "support"
     return _infer_relation_type(fallback_label, 1)
-
 
 
 def _extract_evidence_items_from_trace(events: list, claims: list, label: str) -> list[F3EvidenceItem]:
@@ -532,6 +728,7 @@ def _extract_evidence_items_from_trace(events: list, claims: list, label: str) -
                         query_to_agent_score[query_text] = _normalize_score_value(
                             qe.get("credibilityScore", qe.get("credibility_score"))
                         )
+
     def resolve_claim_order(query: str) -> int:
         value = str(query or "").strip()
         if value in query_to_claim_order:
@@ -549,7 +746,7 @@ def _extract_evidence_items_from_trace(events: list, claims: list, label: str) -
                 best_order = claim.claimOrder
         return best_order
 
-    # 1. 优先使用 search trace：这里带真实标题、URL、来源、发布时间、可信度评分。
+    # 1. 优先使用 search trace
     for e in events:
         if e.get("type") == "search":
             query = str(e.get("query") or "").strip()
@@ -566,7 +763,7 @@ def _extract_evidence_items_from_trace(events: list, claims: list, label: str) -
                 query,
             )
 
-    # 2. 回退使用 evidence_seeker：仅当同一 query 没有 search 结构化证据时使用。
+    # 2. 回退使用 evidence_seeker
     for e in events:
         if e.get("type") == "step" and e.get("node") == "evidence_seeker":
             sr = e.get("structured_response") or {}
@@ -589,182 +786,41 @@ def _extract_evidence_items_from_trace(events: list, claims: list, label: str) -
                     )
 
     return evidence_items
-def _build_detail_db_response(agent: FactAgent, req: FactCheckRequest,
-                                report_style: str = "simple") -> FactCheckDetailDBData:
-    """执行核查并组装数据库对齐版响应体。
-
-    Args:
-        agent: FactAgent 实例
-        req: 请求对象
-        report_style: 报告风格，"simple"=数据驱动Markdown, "llm"=LLM叙事HTML
-    """
-    results = agent.process_claim(
-        req.claim.strip(),
-        recursion_limit=300,
-        verbose=False,
-    )
-
-    # 记录 trace 文件路径
-    if agent.trace.trace_file is not None:
-        logging.getLogger("fact_check").info(
-            "trace file: %s | claim: %s",
-            agent.trace.trace_file, req.claim.strip()[:80],
-        )
-
-    events = agent.trace.events
-
-    # ---- 1. 解析 verdict ----
-    verdict = parse_verdict_from_results(results)
-    label = verdict.get("label", "insufficient_evidence")
-    explanation = verdict.get("explanation", "")
-
-    # ---- 2. 构建 claims ----
-    claims = _extract_claims_from_trace(events, req.claim.strip())
-
-    # ---- 3. 构建 evidences ----
-    evidence_items = _extract_evidence_items_from_trace(events, claims, label)
-    support_count = sum(1 for ev in evidence_items if ev.relationType == "support")
-    attack_count = sum(1 for ev in evidence_items if ev.relationType == "attack")
-
-    # ---- 4. 构建 result ----
-    is_true = label.lower() == "supported"
-    if is_true:
-        conclusion = "声明真实：多个权威来源相互印证。"
-    elif label.lower() == "not_supported":
-        conclusion = "声明虚假：与多方权威信息不符。"
-    else:
-        conclusion = "证据不足以判定声明真伪。"
-
-    if not evidence_items and label.lower() == "not_supported":
-        label = "insufficient_evidence"
-        conclusion = "证据不足以判定声明真伪。"
-
-    confidence_score = verdict.get("confidenceScore")
-
-    # 将 verdict 的 label 映射到更丰富的标签体系
-    if label.lower() == "supported":
-        result_label = "supported"
-    elif label.lower() == "not_supported":
-        result_label = "not_supported"
-    else:
-        result_label = "insufficient_evidence"
-
-    f3_result = F3Result(
-        resultLabel=result_label,
-        confidenceScore=confidence_score,
-        conclusion=conclusion,
-        analysisDetail=explanation or "经多智能体系统分析完成事实核查。",
-        supportCount=support_count,
-        attackCount=attack_count,
-    )
-
-    # ---- 5. 根据 report_style 选择报告模式 ----
-    f3_like = type("F3Like", (), {})()
-    f3_like.claims = claims
-    f3_like.evidences = evidence_items
-    f3_like.result = f3_result
-
-    report_data = ReportModuleData.from_f3_data(
-        f3_like,
-        run_id=agent.trace.run_id if agent.trace else "",
-        generated_at=datetime.now().isoformat(timespec="seconds"),
-    )
-    report_data.claim = req.claim.strip()
-
-    if report_style == "llm":
-        # LLM 叙事模式 — 生成丰富 HTML 报告，失败时降级
-        try:
-            report_result = LLMReportGenerator(report_data).generate(renderer_name="html")
-            report_format = "html"
-        except Exception:
-            logging.getLogger("fact_check").warning(
-                "LLM 报告生成失败，降级为数据驱动模式", exc_info=True
-            )
-            report_result = ReportGenerator(report_data).generate()
-            report_format = "markdown"
-    else:
-        # 数据驱动模式（默认）— 快速 Markdown
-        report_result = ReportGenerator(report_data).generate()
-        report_format = "markdown"
-
-    f3_report = F3Report(
-        reportTitle=report_result.title,
-        reportContent=report_result.content,
-        reportFormat=report_format,
-    )
-
-    return FactCheckDetailDBData(
-        claims=claims,
-        evidences=evidence_items,
-        result=f3_result,
-        report=f3_report,
-    )
 
 
 @router.post(
     "/fact-check/detail/db",
     response_model=ApiResponse[FactCheckDetailDBData],
-    summary="事实核查（数据库对齐版，含声明/证据/结果/报告结构化数据）",
+    summary="[废弃] 数据库对齐版，请使用 /quick 或 /deep",
+    deprecated=True,
 )
 def fact_check_detail_db(req: FactCheckRequest) -> ApiResponse[FactCheckDetailDBData]:
-    data = _build_detail_db_response(get_fact_agent(), req)
+    """[废弃] 数据库对齐版，保持向后兼容（Java 后端当前调用此接口）。
+
+    新代码请使用 POST /internal/v1/fact-check/quick 或 /deep 替代。
+    """
+    if req.reflective:
+        data = _build_deep_response(get_reflective_agent(), req)
+    else:
+        data = _build_quick_response(get_fact_agent(), req)
     return ApiResponse[FactCheckDetailDBData](data=data)
 
 
 # ======================================================================
-# LLM 叙事报告接口 — 额外功能，不替换原有 F3 数据驱动模式
+# [废弃] LLM 叙事报告接口
 # ======================================================================
 
 
 @router.post(
     "/fact-check/detail/llm-report",
     response_model=ApiResponse[FactCheckDetailDBData],
-    summary="事实核查（LLM 叙事报告版，含 AI 生成的丰富 HTML 报告）",
+    summary="[废弃] LLM 叙事报告版，请使用 /deep",
+    deprecated=True,
 )
 def fact_check_llm_report(req: FactCheckRequest) -> ApiResponse[FactCheckDetailDBData]:
-    """LLM 叙事报告版。
+    """[废弃] LLM 叙事报告版。
 
-    在 F3 数据库对齐版的基础上，使用 LLM 生成叙事性 HTML 报告。
-    返回结构与 F3 完全一致，但 report.reportFormat = "html"，
-    report.reportContent 为完整 HTML 页面（含 Hero 区、KPI 卡片、证据分析等）。
-
-    此接口额外消耗一次 LLM 调用（约 30-40s），失败时自动降级为 F3 数据驱动模式。
+    请使用 POST /internal/v1/fact-check/deep 替代，功能相同且返回更完整的结构化数据。
     """
-    agent = get_fact_agent()
-    data = _build_detail_db_response(agent, req)
-
-    # 构造 ReportData
-    f3_like = type("F3Like", (), {})()
-    f3_like.claims = data.claims
-    f3_like.evidences = data.evidences
-    f3_like.result = data.result
-
-    report_data = ReportModuleData.from_f3_data(
-        f3_like,
-        run_id=agent.trace.run_id if agent.trace else "",
-        generated_at=datetime.now().isoformat(timespec="seconds"),
-    )
-    report_data.claim = req.claim.strip()
-
-    try:
-        llm_result = LLMReportGenerator(report_data).generate(renderer_name="html")
-        data.report.reportTitle = llm_result.title
-        data.report.reportContent = llm_result.content
-        data.report.reportFormat = "html"
-    except Exception:
-        logging.getLogger("fact_check").warning(
-            "LLM 报告生成失败，降级为数据驱动 Markdown", exc_info=True
-        )
-
+    data = _build_deep_response(get_reflective_agent(), req)
     return ApiResponse[FactCheckDetailDBData](data=data)
-
-
-
-
-
-
-
-
-
-
-

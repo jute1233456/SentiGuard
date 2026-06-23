@@ -59,8 +59,17 @@ class SearchEngineRetriever:
         from src.main.python.tools.search_base import get_search_engine, list_search_engines
         available = list_search_engines()
         if available:
-            self.search_engine = get_search_engine(available[0])
-            print(f"[Search] 使用搜索引擎: {available[0]}")
+            # 遍历注册表，找到第一个可用的引擎（兜底策略）
+            engine = None
+            for name in available:
+                engine = get_search_engine(name)
+                if engine and engine.is_available():
+                    self.search_engine = engine
+                    print(f"[Search] 使用搜索引擎: {name}")
+                    break
+            else:
+                self.search_engine = None
+                print(f"[Warning] 所有搜索引擎均不可用（共 {len(available)} 个）")
         else:
             self.search_engine = None
             print("[Warning] 未找到可用搜索引擎")
@@ -372,22 +381,35 @@ class SearchEngineRetriever:
 @tool
 def search_retrieve_news(query: str, dataset: str):
     """
-    Searches for news articles related to the given query.
+    （标准模式）快速摘要搜索，返回 10 条结果的摘要列表。
+
+    反思模式（ReflectiveFactAgent）请使用 search_fulltext()。
 
     Args:
         query: The search query string.
-        dataset: The dataset to use for date limits in the search.
+        dataset: The dataset to use for date limits in the search (unused in summary mode).
     Returns:
         A list of dictionaries, where each dictionary represents a search result
         and contains keys like 'url', 'title', 'content', and 'snippet'.
         Returns an empty list if no results are found or if all API keys are exhausted.
     """
+    from src.main.python.tools.search_service import search_summary
     try:
-        search_result = SearchEngineRetriever(dataset).retrieve(queries=[query])
-        return search_result[0]
+        results = search_summary(query, num_results=10)
+        # 保持返回格式兼容：list[dict]
+        return [
+            {
+                "title": e.evidenceTitle,
+                "url": e.evidenceUrl,
+                "snippet": e.evidenceContent,
+                "content": e.evidenceContent,
+                "source": e.sourceName,
+            }
+            for e in results
+        ]
     except Exception as e:
         logging.error(f"Search retrieve error: {e}")
-        return ""
+        return []
 
 
 
