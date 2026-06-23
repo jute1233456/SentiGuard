@@ -1027,11 +1027,13 @@
 
 | 项 | 值 |
 |----|----|
-| 累计条目数 | 43 |
-| 涉及场景类别 | 代码理解、需求分析、接口设计、代码生成、文档撰写、算法理解、知识 Q&A、版本控制、字段精简、文档代码同步、架构调整、验证测试、交付总结、数据源验证、团队协作、数据源扩展、业务功能、数据采集、代码替换、功能完善、项目维护、配置优化、环境变量管理、向后兼容、Bug 排查、测试用例、接口联调、提示词优化、数据库对齐、日志增强、安全加固、置信度评分、报告模块重构、**LLM 叙事报告**、**Java 接口对接**、**结构化 IR 方案**、**Block-type 分派渲染**、**搜索服务优化**、**接口重构** |
-| 已生成代码文件 | 42（重构 fact_check.py，提取 6 个共享函数） |
-| 新增核心文件 | 29 |
+| 累计条目数 | 45 |
+| 涉及场景类别 | 代码理解、需求分析、接口设计、代码生成、文档撰写、算法理解、知识 Q&A、版本控制、字段精简、文档代码同步、架构调整、验证测试、交付总结、数据源验证、团队协作、数据源扩展、业务功能、数据采集、代码替换、功能完善、项目维护、配置优化、环境变量管理、向后兼容、Bug 排查、测试用例、接口联调、提示词优化、数据库对齐、日志增强、安全加固、置信度评分、报告模块重构、**LLM 叙事报告**、**Java 接口对接**、**结构化 IR 方案**、**Block-type 分派渲染**、**搜索服务优化**、**接口重构**、**证据模型重构**、**证据粒度优化**、**LangGraph 新节点** |
+| 已生成代码文件 | 45（新增 evidence_merging.py + 重构 evidence_seeking.py + 重构 fact_check.py + 修改 main_agent.py） |
+| 新增核心文件 | 30（+ evidence_merging.py） |
 | 已生成文档文件 | 8 |
+| 证据模型 | ✓ LLM 逐条判定 relationType + ✓ 逐条搜索结果独立为证据 + ✓ evidence_merger 合并同事件多来源 |
+| LangGraph 节点 | ✓ 新增 evidence_merger 节点，证据流：seeker → merger → verdict |
 | 报告模块 | ✓ 数据驱动模式 + Markdown 渲染 + ✓ LLM 叙事模式（结构化 IR + 9 种 block 类型渲染 + 降级路径） |
 | 结构化 IR | ✓ 9 种 block 类型（heading/paragraph/list/table/callout/kpiGrid/blockquote/evidenceCard/hr） |
 | Block 渲染 | ✓ callout（4 色调）、evidenceCard（可信度条+论辩标签）、kpiGrid、table、list、blockquote |
@@ -1093,3 +1095,61 @@
   - 共享函数消除约 80 行重复代码
   - 返回结构统一，降低对接成本
 - **待办**：快速核查的 HTML 报告生成（当前 quick 返回 Markdown 报告，需后续实现）
+
+---
+
+### 日志条目 #44 — 证据模型重构：LLM 逐条判定 relationType
+
+- **日期**：2026-06-24
+- **场景**：代码重构 / Bug 修复
+- **关键 Prompt**：
+  > "在这个项目里面，证据的数量是怎么判定的？我认为这个有问题"
+  > "我的天哪，这个一定需要修改，每个证据是否支持观点一定是llm来判断的呀"
+- **背景**：用户发现证据的 `relationType`（support/attack/neutral）不是由 LLM 判断，而是通过硬编码关键词（如"306"、"232"、"11月3日"等美国大选特化词）在事后推断，回退路径甚至根据全局 verdict 给所有证据赋同一 relationType——导致 `supportCount`/`attackCount` 完全失真。
+- **AI 产出**：
+  - **`prompts/evidence_seeking.py`** — Schema 新增 `relationType` 枚举字段（support/attack/neutral），设为 required；Prompt 新增第 6 条规则，要求 LLM 基于证据内容与子声明语义对比逐条判断
+  - **`api/routers/fact_check.py`** — `_extract_evidence_items_from_trace()` 优先从 evidence_seeker 输出的 `relationType` 读取，保留关键词推断作为回退
+  - **`tools/search_service.py`** — `search_fulltext()` 新增 `default_relation` 参数，避免深度核查补充证据硬编码为 neutral
+- **人工修改**：无
+- **风险控制**：
+  - 旧的关键词回退逻辑保留，新 LLM 判定为空时才触发
+  - search_fulltext 的 default_relation 参数有默认值，向后兼容
+- **价值**：证据的论辩关系从"硬编码关键词猜测 + 全局回退"升级为"LLM 逐条语义判定"，supportCount/attackCount 从此反映真实的证据分布
+
+---
+
+### 日志条目 #45 — 证据粒度重构 + evidence_merger 节点
+
+- **日期**：2026-06-24
+- **场景**：代码重构 / 功能升级
+- **关键 Prompt**：
+  > "我们需要重新审视证据本身，一次搜索是吧所有的搜索结构封装成一个证据吗？应该是搜到几个新闻，每个新闻一个证据"
+  > "在搜集新闻之后，第一步是llm给每个新闻弄成证据，第二步是合并同样的内容"
+- **背景**：上一轮改造后 relationType 由 LLM 判定，但证据粒度仍然有问题——一个搜索查询的 10 条结果被 LLM 揉成 1 段 evidence 字符串，损失了每条结果各自的 url/title/source/relationType。同时，同一事件被多家媒体报道应合并为一条证据并提升可信度。
+- **AI 产出**：
+
+  **A. 证据粒度从"1 查询 = 1 证据"改为"1 搜索结果 = 1 证据"**
+  - **`prompts/evidence_seeking.py`** — Schema 重构：单字段 `evidence`（string）改为 `evidences[]` 数组，每条含 `title/url/source/content/credibilityScore/relationType`；Prompt 明确要求逐条处理、禁止合并
+  - **`api/routers/fact_check.py`** — `_extract_evidence_items_from_trace()` 重写为主数据源从 `evidences[]` 数组展开，弃用旧的 search trace 单条记录路径
+
+  **B. 新增 evidence_merger 节点（LangGraph 新节点）**
+  - **`prompts/evidence_merging.py`**（新建）— 定义 `merged_evidences[]` JSON Schema，每条合并证据含 `summary` + `sources[]`（多个来源共享 summary/credibilityScore/relationType）
+  - **`main_agent.py`** — 在 evidence_seeker 与 verdict_predictor 之间插入 evidence_merger 节点：新增 `evidence_merging_agent`、`evidence_merging_node`，修改 supervisor 成员列表和 graph 注册
+  - **`api/routers/fact_check.py`** — 提取逻辑优先从 evidence_merger 的 `merged_evidences` 读取，回退到 evidence_seeker 原始输出
+
+- **数据流**：
+  ```
+  evidence_seeker  →  逐条输出（每搜索结果 1 条，含独立 url/title/relationType）
+  evidence_merger  →  合并同一事件的多来源为 1 条 merged_evidence（sources[] 含所有来源，共享 summary/credibilityScore）
+  verdict_predictor →  基于合并后的证据做最终判定
+  ```
+- **人工修改**：无
+- **风险控制**：
+  - evidence_merger 输出优先，回退到 evidence_seeker 原始输出，不破坏旧 trace 兼容
+  - supervisor 调度 merger 节点，evidence_seeker 输出完整传给 merger 的对话上下文
+  - 合并时保留反驳/中性证据，不因合并丢失信息
+- **价值**：
+  - 每条搜索结果独立为一条证据，保留各自的 url/title/source/relationType
+  - 同一事件多来源报道合并为一条，sources 数组汇总所有来源
+  - 合并后的 credibilityScore 因多来源相互印证而提升，反映真实可信度
+  - supportCount 按合并后条数计算，不再膨胀

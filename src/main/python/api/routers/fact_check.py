@@ -669,14 +669,14 @@ def _infer_evidence_relation(subclaim: str, evidence_text: str, fallback_label: 
 
 
 def _extract_evidence_items_from_trace(events: list, claims: list, label: str) -> list[F3EvidenceItem]:
-    """从 search trace 优先提取证据；缺少 search 时回退到 evidence_seeker 文本。"""
+    """从 trace 提取证据：优先从 evidence_merger 合并输出读取，回退到 evidence_seeker 原始输出。"""
     evidence_items: list[F3EvidenceItem] = []
     seen = set()
-    search_queries_with_evidence = set()
 
     def add_item(claim_order: int, title: str, content: str, url: str = "",
                  source_name: str = "", subclaim: str = "", publish_time: str = "",
-                 credibility_score: int | None = None, query: str = "") -> bool:
+                 credibility_score: int | None = None,
+                 relation_type_override: str | None = None) -> bool:
         if not _valid_evidence_text(content):
             return False
         clean_title = str(title or "检索证据").strip()
@@ -686,7 +686,10 @@ def _extract_evidence_items_from_trace(events: list, claims: list, label: str) -
         if key in seen:
             return False
         seen.add(key)
-        relation_type = _infer_evidence_relation(subclaim, clean_content, label)
+        if relation_type_override in ("support", "attack", "neutral"):
+            relation_type = relation_type_override
+        else:
+            relation_type = _infer_evidence_relation(subclaim, clean_content, label)
         credibility_score = _normalize_score_value(credibility_score)
         evidence_items.append(F3EvidenceItem(
             claimOrder=claim_order,
@@ -699,12 +702,32 @@ def _extract_evidence_items_from_trace(events: list, claims: list, label: str) -
             credibilityScore=credibility_score,
             publishTime=publish_time or None,
         ))
-        if query:
-            search_queries_with_evidence.add(query)
         return True
 
+    # 1. 优先从 evidence_merger 的合并输出读取
+    for e in events:
+        if e.get("type") == "step" and e.get("node") == "evidence_merger":
+            sr = e.get("structured_response") or {}
+            for me in sr.get("merged_evidences") or []:
+                claim_order = me.get("claimOrder", 1)
+                summary = me.get("summary", "")
+                relation_type = me.get("relationType", label)
+                credibility_score = me.get("credibilityScore")
+                for src in me.get("sources") or []:
+                    add_item(
+                        claim_order=claim_order,
+                        title=src.get("title", ""),
+                        content=summary,
+                        url=src.get("url", ""),
+                        source_name=src.get("source", ""),
+                        subclaim=me.get("claimText", ""),
+                        credibility_score=credibility_score,
+                        relation_type_override=relation_type,
+                    )
+            return evidence_items  # 合并输出只取一次
+
+    # 2. 回退：从 evidence_seeker 的原始输出展开
     query_to_claim_order: dict[str, int] = {}
-    query_to_subclaim: dict[str, str] = {}
     for e in events:
         if e.get("type") == "step" and e.get("node") == "query_generator":
             sr = e.get("structured_response") or {}
@@ -715,75 +738,26 @@ def _extract_evidence_items_from_trace(events: list, claims: list, label: str) -
                     query_text = str(query or "").strip()
                     if query_text:
                         query_to_claim_order[query_text] = claim_order
-                        query_to_subclaim[query_text] = subclaim
 
-    query_to_agent_score: dict[str, int | None] = {}
     for e in events:
         if e.get("type") == "step" and e.get("node") == "evidence_seeker":
             sr = e.get("structured_response") or {}
             for item in sr.get("subclaims_with_query_evidence") or []:
-                for qe in item.get("queries_with_evidence") or []:
-                    query_text = str(qe.get("query") or "").strip()
-                    if query_text:
-                        query_to_agent_score[query_text] = _normalize_score_value(
-                            qe.get("credibilityScore", qe.get("credibility_score"))
-                        )
-
-    def resolve_claim_order(query: str) -> int:
-        value = str(query or "").strip()
-        if value in query_to_claim_order:
-            return query_to_claim_order[value]
-        best_order = claims[0].claimOrder if claims else 1
-        best_score = 0
-        for claim in claims:
-            claim_text = claim.claimText or ""
-            score = 0
-            for token in ["特朗普", "拜登", "选举人票", "投票日", "11月3日", "连任", "总统大选", "结果"]:
-                if token in value and token in claim_text:
-                    score += 1
-            if score > best_score:
-                best_score = score
-                best_order = claim.claimOrder
-        return best_order
-
-    # 1. 优先使用 search trace
-    for e in events:
-        if e.get("type") == "search":
-            query = str(e.get("query") or "").strip()
-            title = e.get("source_title") or (f"检索问题：{query}" if query else "搜索证据")
-            add_item(
-                resolve_claim_order(query),
-                title,
-                e.get("evidence_snippet"),
-                e.get("chosen_url", ""),
-                e.get("source_name", ""),
-                query_to_subclaim.get(query, query),
-                e.get("publish_time", ""),
-                query_to_agent_score.get(query),
-                query,
-            )
-
-    # 2. 回退使用 evidence_seeker
-    for e in events:
-        if e.get("type") == "step" and e.get("node") == "evidence_seeker":
-            sr = e.get("structured_response") or {}
-            for item in sr.get("subclaims_with_query_evidence") or []:
-                claim_order = _claim_order_for_text(claims, item.get("subclaim", ""))
+                subclaim = str(item.get("subclaim") or "").strip()
+                base_claim_order = _claim_order_for_text(claims, subclaim)
                 for qe in item.get("queries_with_evidence") or []:
                     query = str(qe.get("query") or "").strip()
-                    if query and query in search_queries_with_evidence:
-                        continue
-                    content = qe.get("evidence")
-                    title = f"检索问题：{query}" if query else "检索证据"
-                    agent_score = qe.get("credibilityScore", qe.get("credibility_score"))
-                    add_item(
-                        resolve_claim_order(query) if query else claim_order,
-                        title,
-                        content,
-                        subclaim=item.get("subclaim", ""),
-                        credibility_score=agent_score,
-                        query=query,
-                    )
+                    for ev in qe.get("evidences") or []:
+                        add_item(
+                            claim_order=query_to_claim_order.get(query, base_claim_order),
+                            title=ev.get("title", ""),
+                            content=ev.get("content", ""),
+                            url=ev.get("url", ""),
+                            source_name=ev.get("source", ""),
+                            subclaim=subclaim,
+                            credibility_score=ev.get("credibilityScore"),
+                            relation_type_override=ev.get("relationType"),
+                        )
 
     return evidence_items
 

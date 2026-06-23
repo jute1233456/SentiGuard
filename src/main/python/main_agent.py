@@ -17,6 +17,7 @@ from src.main.python.prompts.input_ingestion import (
 )
 from src.main.python.prompts.query_generation import query_generation_prompt, query_generation
 from src.main.python.prompts.evidence_seeking import evidence_seeking_prompt, evidence_seeking
+from src.main.python.prompts.evidence_merging import evidence_merging_prompt, evidence_merging
 from src.main.python.prompts.verdict_prediction import verdict_prediction_prompt, verdict_prediction
 from src.main.python.tools.retrieve import search_retrieve_news
 from src.main.python import tracing
@@ -138,6 +139,10 @@ class FactAgent:
             self.llm, tools=[search_retrieve_news], prompt=evidence_seeking_prompt,
             response_format=evidence_seeking,
         )
+        self.evidence_merging_agent = create_react_agent(
+            self.llm, tools=[], prompt=evidence_merging_prompt,
+            response_format=evidence_merging,
+        )
         self.verdict_prediction_agent = create_react_agent(
             self.llm, tools=[], prompt=verdict_prediction_prompt,
             response_format=verdict_prediction,
@@ -232,6 +237,19 @@ class FactAgent:
                 goto="supervisor",
             )
 
+        def evidence_merging_node(state: State) -> Command:
+            """将 evidence_seeker 的多条独立证据合并为 merged_evidences（同一事件多来源合并）。"""
+            result = self.evidence_merging_agent.invoke(state)
+            sr = result.get("structured_response", {})
+            self.trace.step("evidence_merger", sr)
+            return Command(
+                update={"messages": [
+                    HumanMessage(content=str(sr.get("merged_evidences")),
+                                 name="evidence_merger"),
+                ]},
+                goto="supervisor",
+            )
+
         def verdict_prediction_node(state: State) -> Command:
             result = self.verdict_prediction_agent.invoke(state)
             sr = result.get("structured_response", {})
@@ -248,7 +266,7 @@ class FactAgent:
             )
 
         orchestrator = self._make_supervisor_node(
-            ["input_ingestor", "query_generator", "evidence_seeker", "verdict_predictor"],
+            ["input_ingestor", "query_generator", "evidence_seeker", "evidence_merger", "verdict_predictor"],
             graph_name="main",
         )
         super_builder = StateGraph(State)
@@ -256,6 +274,7 @@ class FactAgent:
         super_builder.add_node("input_ingestor", call_input_ingestion_team)
         super_builder.add_node("query_generator", query_generation_node)
         super_builder.add_node("evidence_seeker", evidence_seeking_node)
+        super_builder.add_node("evidence_merger", evidence_merging_node)
         super_builder.add_node("verdict_predictor", verdict_prediction_node)
         super_builder.add_edge(START, "supervisor")
         self.super_graph = super_builder.compile()

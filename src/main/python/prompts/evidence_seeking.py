@@ -23,18 +23,46 @@ evidence_seeking = {
                                         "type": "string",
                                         "description": "A query generated to seek evidence for the subclaim."
                                     },
-                                    "evidence": {
-                                        "type": "string",
-                                        "description": "搜索引擎返回的中文证据摘要，必须使用中文撰写，包含最新数据和具体来源。"
-                                    },
-                                    "credibilityScore": {
-                                        "type": "integer",
-                                        "minimum": 0,
-                                        "maximum": 100,
-                                        "description": "你基于检索结果来源权威性、内容相关性、发布时间、证据完整性计算得到的证据可信度，0-100。"
+                                    "evidences": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "properties": {
+                                                "title": {
+                                                    "type": "string",
+                                                    "description": "证据来源的文章标题"
+                                                },
+                                                "url": {
+                                                    "type": "string",
+                                                    "description": "证据来源的 URL"
+                                                },
+                                                "source": {
+                                                    "type": "string",
+                                                    "description": "来源网站名称或域名"
+                                                },
+                                                "content": {
+                                                    "type": "string",
+                                                    "description": "从该搜索结果中提取的与查询相关的证据内容摘要，必须使用中文撰写。"
+                                                },
+                                                "credibilityScore": {
+                                                    "type": "integer",
+                                                    "minimum": 0,
+                                                    "maximum": 100,
+                                                    "description": "你基于该条证据来源权威性、内容相关性、发布时间、证据完整性计算得到的可信度，0-100。"
+                                                },
+                                                "relationType": {
+                                                    "type": "string",
+                                                    "enum": ["support", "attack", "neutral"],
+                                                    "description": "判断本条证据对子声明(claim)的关系：support=支持（证据佐证声明为真），attack=反驳（证据表明声明为假），neutral=中性（证据与声明无直接关系或无法判断）。必须基于证据内容与子声明进行语义对比后判定。"
+                                                }
+                                            },
+                                            "required": ["title", "url", "source", "content", "credibilityScore", "relationType"],
+                                            "additionalProperties": False
+                                        },
+                                        "description": "该查询对应的多条证据列表，每条证据来自一条独立的搜索结果。必须逐条列出，不可合并。"
                                     }
                                 },
-                                "required": ["query", "evidence", "credibilityScore"],
+                                "required": ["query", "evidences"],
                                 "additionalProperties": False
                             },
                             "description": "A list of queries and their corresponding evidence for the subclaim."
@@ -61,12 +89,22 @@ evidence_seeking_prompt = """
 3. **全部使用中文输出**：证据摘要必须用中文撰写，引用来源时保留原文关键术语。
 4. **引用来源**：在证据中提及信息来源的名称或网站，增强可信度。
 5. **如实报告**：如果搜索工具返回空结果或错误，如实说明未找到相关信息，不要编造。
+6. **逐条判断证据关系**：对每条独立的搜索结果，必须分别判断其对子声明的论辩关系（relationType）：
+   - `support`：证据内容支持/佐证该子声明为真
+   - `attack`：证据内容反驳/否定该子声明
+   - `neutral`：证据与子声明无直接关系，或信息不足以判断
+   每条证据独立判断，不要因为整体结论而偏向某一方向。
 
 ## 工作流程
 
 1. 接收上一步生成的子声明和问题列表
 2. 对每个问题，调用 `search_retrieve_news(query=问题内容, dataset="fever")`
-3. 从搜索结果中提取与问题直接相关的信息
-4. 将提取的证据用中文整理到 `evidence` 字段
-5. 必须为每条证据给出 `credibilityScore`，分数由你基于来源权威性、内容相关性、发布时间、证据完整性综合计算，范围 0-100
+3. 搜索工具返回的是一个列表，**每条结果是一条独立的证据**，来自不同的来源
+4. 逐条处理每一条搜索结果：
+   - 提取其 `title`、`url`、`content`/`snippet`、`source`
+   - 将内容用中文整理到 `content` 字段
+   - 给出该条证据的 `credibilityScore`（基于来源权威性、相关性、时效性）
+   - 判断该条证据对子声明的 `relationType`
+5. 将所有搜索结果逐条填入 `evidences` 数组，**禁止将多条合并为一条**
+6. 如果搜索结果不足 3 条，如实报告已有的结果即可，不要编造
 """

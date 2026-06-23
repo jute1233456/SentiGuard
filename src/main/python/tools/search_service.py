@@ -131,7 +131,8 @@ def search_summary(query: str, num_results: int = 10) -> list:
 # 全文搜索模式
 # ======================================================================
 
-def search_fulltext(query: str, dataset: str = "fever", num_results: int = 10) -> list:
+def search_fulltext(query: str, dataset: str = "fever", num_results: int = 10,
+                    default_relation: str = "neutral") -> list:
     """全文搜索模式：对每一条搜索结果都提取全文，转成 F3EvidenceItem 列表。
 
     复用 SearchEngineRetriever 的 Selenium 抓取 + LLM 抽取能力：
@@ -146,6 +147,7 @@ def search_fulltext(query: str, dataset: str = "fever", num_results: int = 10) -
         query: 搜索查询语句。
         dataset: 数据集名称（用于日期限制），默认 "fever"。
         num_results: 返回结果数量，默认 10。
+        default_relation: 证据 relationType 默认值，"neutral"/"support"/"attack"。
 
     Returns:
         List[F3EvidenceItem]: 证据列表。失败时返回空列表。
@@ -214,7 +216,7 @@ def search_fulltext(query: str, dataset: str = "fever", num_results: int = 10) -
             evidenceUrl=url,
             sourceName=str(r.source or "搜索检索结果")[:100],
             evidenceType="web",
-            relationType="neutral",
+            relationType=default_relation if default_relation in ("support", "attack", "neutral") else "neutral",
             credibilityScore=_normalize_score_value(r.score),
         ))
 
