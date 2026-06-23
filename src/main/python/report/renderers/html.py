@@ -159,8 +159,14 @@ class HTMLRenderer(BaseRenderer):
 
     def _render_heading_block(self, block: Dict[str, Any]) -> str:
         """渲染 heading block"""
-        level = min(max(int(block.get("level", 2)), 1), 6)
+        # 容错处理：level 可能是字符串甚至中文
+        try:
+            level = min(max(int(block.get("level", 2)), 1), 6)
+        except (ValueError, TypeError):
+            level = 2
         text = self._escape(block.get("text", ""))
+        if not text:
+            return ""
         anchor = block.get("anchor", "")
         if anchor:
             return f'<h{level} id="{self._escape(anchor)}">{text}</h{level}>'
@@ -170,6 +176,10 @@ class HTMLRenderer(BaseRenderer):
         """渲染 paragraph block（含 inline marks）"""
         inlines = block.get("inlines", [])
         if not inlines:
+            # 容错：如果 inlines 为空，尝试从 text/content 字段取文本
+            fallback_text = block.get("text") or block.get("content", "")
+            if fallback_text:
+                return f"<p>{self._escape(fallback_text)}</p>"
             return ""
         html_parts: List[str] = []
         for run in inlines:
@@ -298,6 +308,10 @@ class HTMLRenderer(BaseRenderer):
         url = block.get("url", "")
         relation_type = block.get("relationType", "neutral")
         credibility = block.get("credibilityScore")
+
+        # 容错：如果没有内容，不渲染
+        if not title and not content:
+            return ""
 
         # 论辩关系标签
         relation_labels = {

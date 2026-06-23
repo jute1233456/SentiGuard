@@ -60,39 +60,40 @@ SYSTEM_PROMPT_CHAPTER_IR = """
 - **不要写"综上所述"、"如前面所述"等跨章节引用**
 - 直接深入撰写该章节的核心内容
 
-## 可用的 Block 类型
+## 可用的 Block 类型（所有字段都是必需的，除非注明"可选"）
 
-1. **heading**: 标题
-   - level: 1-3（1 最大）
-   - text: 标题文本
-   - anchor: 锚点ID
+1. **heading** — 每个章节必须以一个 heading 开头
+   - 必须包含: level(整数2), text(标题文本), anchor(锚点ID)
+   - 示例: {"type":"heading", "level":2, "text":"证据分析", "anchor":"sec-evidence"}
 
-2. **paragraph**: 段落
-   - inlines: [{text, marks?[{type}]}]
-   - marks.type 支持: "bold", "italic"
+2. **paragraph** — 正文段落
+   - 必须包含: inlines(非空数组)
+   - inlines 每项: {text(文本), marks?[{"type":"bold"或"italic"}]}
+   - 示例: {"type":"paragraph", "inlines":[{"text":"这是一个段落。"}]}
 
-3. **list**: 列表
-   - listType: "ordered" 或 "bullet"
-   - items: [[block, ...], ...]
+3. **list** — 列表
+   - 必须包含: listType("ordered"或"bullet"), items(非空数组)
+   - items 格式: [[block1, block2], [block3, ...]] — 每个列表项是一个 block 数组
 
-4. **table**: 表格
-   - rows: [{cells: [{text}]}]
+4. **table** — 表格
+   - 必须包含: rows(非空数组)
+   - rows 格式: [{"cells":[{"text":"表头1"},{"text":"表头2"}]}, {"cells":[{"text":"数据1"},{"text":"数据2"}]}]
 
-5. **callout**: 提示框
-   - tone: "info" | "warning" | "success" | "danger"
-   - 用于突出关键发现、风险提示
+5. **callout** — 提示框（用于突出关键发现、风险提示）
+   - 必须包含: tone("info"/"warning"/"success"/"danger"), blocks(非空数组)
 
-6. **kpiGrid**: KPI 卡片网格
-   - items: [{label, value, tone?}]
-   - 仅在该章有独特的细分指标时使用
+6. **kpiGrid** — KPI 卡片网格
+   - 必须包含: items(非空数组)
+   - items 每项: {label(标签), value(数值), tone?("good"/"bad"/"neutral")}
 
-7. **blockquote**: 引用
-   - text: 引用文本
+7. **blockquote** — 引用
+   - 必须包含: text(引用文本)
 
-8. **evidenceCard**: 证据卡片
-   - claimOrder/title/content/source/url/relationType/credibilityScore
+8. **evidenceCard** — 证据卡片
+   - 必须包含: claimOrder(整数), title(标题), content(摘要), source(来源), relationType("support"/"attack"/"neutral")
+   - 可选: url(链接), credibilityScore(0-100整数)
 
-9. **hr**: 分隔线
+9. **hr** — 分隔线（无字段）
 
 ## 输出格式
 

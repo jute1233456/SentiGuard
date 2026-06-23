@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>口服胶原蛋白有效性声明核查报告</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --text: #1a1a2e;
+    --muted: #6c757d;
+    --border: #e9ecef;
+    --accent: #4361ee;
+    --accent-light: #eef0ff;
+    --good: #2d6a4f;
+    --good-bg: #d8f3dc;
+    --bad: #9b2226;
+    --bad-bg: #f8d7da;
+    --neutral: #6c757d;
+    --neutral-bg: #e9ecef;
+    --shadow: 0 2px 8px rgba(0,0,0,0.08);
+    --radius: 12px;
+    --callout-info: #4361ee;
+    --callout-info-bg: #eef0ff;
+    --callout-warning: #e8590c;
+    --callout-warning-bg: #fff4e6;
+    --callout-success: #2d6a4f;
+    --callout-success-bg: #d8f3dc;
+    --callout-danger: #9b2226;
+    --callout-danger-bg: #f8d7da;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f0f1a;
+      --text: #e0e0e0;
+      --muted: #9ca3af;
+      --border: #2d2d44;
+      --accent: #6c8cff;
+      --accent-light: #1a1a3e;
+      --good: #52b788;
+      --good-bg: #1b3a2a;
+      --bad: #ef4444;
+      --bad-bg: #3b1a1a;
+      --neutral-bg: #2d2d44;
+      --shadow: 0 2px 8px rgba(0,0,0,0.3);
+      --callout-info: #6c8cff;
+      --callout-info-bg: #1a1a3e;
+      --callout-warning: #ff922b;
+      --callout-warning-bg: #2d1f0a;
+      --callout-success: #52b788;
+      --callout-success-bg: #1b3a2a;
+      --callout-danger: #ef4444;
+      --callout-danger-bg: #3b1a1a;
+    }
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.8;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 24px 20px;
+  }
+
+  /* Hero 区域 */
+  .hero { margin-bottom: 32px; padding: 32px; background: var(--accent-light); border-radius: var(--radius); }
+  .hero h1 { font-size: 1.8em; margin-bottom: 16px; color: var(--accent); }
+  .hero .summary { font-size: 1.05em; color: var(--text); line-height: 1.8; }
+  .findings { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 20px; }
+  .finding { padding: 12px 16px; background: var(--bg); border-radius: 8px; border-left: 3px solid var(--accent); }
+  .finding strong { display: block; margin-bottom: 4px; color: var(--accent); }
+  .finding p { font-size: 0.9em; color: var(--muted); margin: 0; }
+
+  /* KPI 卡片 */
+  .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 32px; }
+  .kpi-card { padding: 16px; border-radius: var(--radius); text-align: center; box-shadow: var(--shadow); }
+  .kpi-card.good { background: var(--good-bg); }
+  .kpi-card.bad { background: var(--bad-bg); }
+  .kpi-card.neutral { background: var(--neutral-bg); }
+  .kpi-label { font-size: 0.8em; color: var(--muted); margin-bottom: 4px; }
+  .kpi-value { font-size: 1.4em; font-weight: 700; }
+
+  /* 章节 */
+  .chapter { margin-bottom: 32px; }
+
+  /* Callout 提示框 */
+  .callout { display: flex; gap: 12px; padding: 16px; margin: 16px 0; border-radius: var(--radius); border-left: 4px solid; }
+  .callout-info { background: var(--callout-info-bg); border-color: var(--callout-info); }
+  .callout-warning { background: var(--callout-warning-bg); border-color: var(--callout-warning); }
+  .callout-success { background: var(--callout-success-bg); border-color: var(--callout-success); }
+  .callout-danger { background: var(--callout-danger-bg); border-color: var(--callout-danger); }
+  .callout-icon { font-size: 1.3em; line-height: 1.4; flex-shrink: 0; }
+  .callout-title { font-weight: 600; margin-bottom: 6px; }
+  .callout-body p { margin: 4px 0; }
+  .callout-body ul, .callout-body ol { margin: 4px 0; padding-left: 20px; }
+
+  /* 证据卡片 */
+  .evidence-card { border: 1px solid var(--border); border-radius: var(--radius); margin: 12px 0; overflow: hidden; box-shadow: var(--shadow); }
+  .evidence-header { display: flex; align-items: center; gap: 10px; padding: 8px 14px; background: var(--accent-light); font-size: 0.85em; }
+  .evidence-relation { display: inline-block; padding: 2px 10px; border-radius: 12px; font-weight: 600; font-size: 0.85em; }
+  .evidence-relation.support { background: var(--good-bg); color: var(--good); }
+  .evidence-relation.attack { background: var(--bad-bg); color: var(--bad); }
+  .evidence-relation.neutral { background: var(--neutral-bg); color: var(--neutral); }
+  .evidence-claim { color: var(--muted); }
+  .evidence-body { padding: 12px 14px; }
+  .evidence-title { font-weight: 600; margin-bottom: 6px; font-size: 1em; }
+  .evidence-content { font-size: 0.9em; color: var(--text); line-height: 1.7; margin-bottom: 8px; }
+  .evidence-credibility { display: flex; align-items: center; gap: 8px; font-size: 0.8em; color: var(--muted); }
+  .cred-bar { flex: 1; height: 6px; background: var(--neutral-bg); border-radius: 3px; overflow: hidden; }
+  .cred-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+  .cred-fill.high { background: var(--good); }
+  .cred-fill.mid { background: var(--callout-warning); }
+  .cred-fill.low { background: var(--bad); }
+  .evidence-footer { padding: 8px 14px; border-top: 1px solid var(--border); font-size: 0.85em; }
+  .evidence-source { color: var(--accent); text-decoration: none; }
+  .evidence-source:hover { text-decoration: underline; }
+
+  /* 报告正文通用样式 */
+  .report-body, .chapter {
+    padding: 0 4px;
+  }
+  .report-body h2, .chapter h2 { font-size: 1.4em; margin: 32px 0 12px; padding-bottom: 8px; border-bottom: 2px solid var(--accent); color: var(--accent); }
+  .report-body h3, .chapter h3 { font-size: 1.15em; margin: 24px 0 8px; color: var(--text); }
+  .report-body h4, .chapter h4 { font-size: 1.05em; margin: 20px 0 6px; color: var(--text); }
+  .report-body p, .chapter p { margin: 10px 0; line-height: 1.9; }
+  .report-body ul, .report-body ol, .chapter ul, .chapter ol { margin: 10px 0; padding-left: 24px; }
+  .report-body li, .chapter li { margin: 6px 0; line-height: 1.7; }
+  .report-body table, .chapter table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 0.9em; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+  .report-body th, .report-body td, .chapter th, .chapter td { padding: 10px 14px; border: 1px solid var(--border); text-align: left; }
+  .report-body th, .chapter th { background: var(--accent-light); font-weight: 600; color: var(--accent); }
+  .report-body tr:nth-child(even), .chapter tr:nth-child(even) { background: var(--accent-light); }
+  .report-body blockquote, .chapter blockquote { border-left: 4px solid var(--accent); padding: 12px 16px; margin: 12px 0; background: var(--accent-light); border-radius: 0 8px 8px 0; }
+  .report-body blockquote p, .chapter blockquote p { margin: 0; }
+  .report-body hr, .chapter hr { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
+  .report-body code { background: var(--neutral-bg); padding: 2px 6px; border-radius: 4px; font-size: 0.9em; font-family: 'JetBrains Mono', 'Fira Code', monospace; }
+  .report-body pre { background: var(--neutral-bg); padding: 16px; border-radius: 8px; overflow-x: auto; margin: 12px 0; }
+  .section { margin-bottom: 24px; }
+
+  @media (max-width: 600px) {
+    body { padding: 16px 12px; }
+    .hero { padding: 20px; }
+    .hero h1 { font-size: 1.4em; }
+    .kpi-row { grid-template-columns: repeat(2, 1fr); }
+    .evidence-header { flex-wrap: wrap; }
+  }
+</style>
+</head>
+<body>
+<div class="hero"><h1>口服胶原蛋白有效性声明核查报告</h1><p class="summary">本报告针对“口服胶原蛋白是有效的”这一声明开展事实核查，通过检索权威临床研究及多方专业观点等5条证据进行分析。核查发现，该声明为无限定条件的绝对化表述，虽部分研究显示特定条件下（每日5-10g水解胶原蛋白，8-12周）可改善皮肤水分、弹性等状态，但质疑方指出胶原蛋白进入消化道后分解为氨基酸，与普通蛋白质无本质区别，且效果受分子形态、个体状态等限制，机制未完全阐明。因声明未限定适用条件，无法被证据充分支持，最终判定为not_supported，置信度50/100。</p><div class="findings"><div class="finding"><strong>声明属性</strong><p>待核查声明为无限定条件的绝对化表述</p></div><div class="finding"><strong>证据分歧</strong><p>关于口服胶原蛋白有效性，支持与质疑观点存在明显对立，支持仅在特定条件下成立</p></div><div class="finding"><strong>判定核心</strong><p>因声明未限定适用条件，无法被现有证据充分支持</p></div></div></div>
+<div class="kpi-row"><div class="kpi-card bad"><div class="kpi-label">置信度</div><div class="kpi-value">50/100</div></div><div class="kpi-card neutral"><div class="kpi-label">证据总量</div><div class="kpi-value">5 条</div></div><div class="kpi-card bad"><div class="kpi-label">支持 / 反驳</div><div class="kpi-value">0 / 5</div></div></div>
+<section id="section-summary" class="chapter">
+<h2 id="sec-summary">报告摘要</h2><p>本次事实核查针对待核查声明「口服胶原蛋白是有效的」展开，核查结果为不支持，置信度为50。核心结论为：该声明虚假，与多方权威信息不符。</p>
+</section>
+<section id="section-claims" class="chapter">
+<h2 id="sec-claims">声明拆解</h2><p>本章节待核查的唯一声明为：<strong>口服胶原蛋白是有效的</strong>。该声明属于绝对化表述，未明确“有效”的适用范围、有效程度及适用人群等限定条件，存在信息模糊性，具备核查必要性，需通过科学证据验证其有效性的真实性与准确性。</p>
+</section>
+<section id="section-evidence" class="chapter">
+<h2 id="sec-evidence">证据分析</h2><div class="evidence-card"><div class="evidence-header"><span class="evidence-relation attack">反驳</span><span class="evidence-claim">声明 #1</span></div><div class="evidence-body"><div class="evidence-title">口服胶原蛋白到底有没有用？科学解读不盲目跟风</div><div class="evidence-content">口服胶原蛋白的有效性存在争议，质疑方认为其进入消化道后会被分解为氨基酸，与普通蛋白质无本质区别；支持方称亲测皮肤变好，核心影响变量为胶原蛋白分子形态、配方协同成分、使用者身体状态</div></div><div class="evidence-footer"><a href="https://m.sohu.com/a/1031098786_411732/" class="evidence-source" target="_blank" rel="noopener">m.sohu.com &#8599;</a></div></div><div class="evidence-card"><div class="evidence-header"><span class="evidence-relation attack">反驳</span><span class="evidence-claim">声明 #1</span></div><div class="evidence-body"><div class="evidence-title">检索问题：口服胶原蛋白是否真的有效</div><div class="evidence-content">口服胶原蛋白有效性存争议：质疑方认为其分解为氨基酸后与其他蛋白质无差异；支持方有临床研究显示，每日口服5-10g水解胶原蛋白8-12周可改善皮肤水分、弹性、皱纹，机制为特定二肽/三肽刺激皮肤成纤维细胞，效果取决于分子形态、配方协同性、个体年龄状态</div><div class="evidence-credibility"><span class="cred-label">可信度</span><div class="cred-bar"><div class="cred-fill high" style="width:80%"></div></div><span class="cred-value">80/100</span></div></div><div class="evidence-footer"><span class="evidence-source">搜索检索结果</span></div></div><div class="evidence-card"><div class="evidence-header"><span class="evidence-relation attack">反驳</span><span class="evidence-claim">声明 #1</span></div><div class="evidence-body"><div class="evidence-title">检索问题：口服胶原蛋白的功效有哪些科学依据</div><div class="evidence-content">多项临床研究证实，每日口服5-10g水解胶原蛋白8-12周，受试者皮肤水分、弹性、皱纹深度有统计学意义改善，机制为分解产生的特定二肽/三肽刺激皮肤成纤维细胞合成自身胶原蛋白</div><div class="evidence-credibility"><span class="cred-label">可信度</span><div class="cred-bar"><div class="cred-fill high" style="width:85%"></div></div><span class="cred-value">85/100</span></div></div><div class="evidence-footer"><span class="evidence-source">搜索检索结果</span></div></div><div class="evidence-card"><div class="evidence-header"><span class="evidence-relation attack">反驳</span><span class="evidence-claim">声明 #1</span></div><div class="evidence-body"><div class="evidence-title">检索问题：口服胶原蛋白在哪些方面被证实有效</div><div class="evidence-content">现有研究证实口服水解胶原蛋白可改善皮肤水分、弹性、皱纹深度，效果与产品分子形态、配方协同性及使用者年龄、身体状态相关</div><div class="evidence-credibility"><span class="cred-label">可信度</span><div class="cred-bar"><div class="cred-fill high" style="width:80%"></div></div><span class="cred-value">80/100</span></div></div><div class="evidence-footer"><span class="evidence-source">搜索检索结果</span></div></div><div class="evidence-card"><div class="evidence-header"><span class="evidence-relation attack">反驳</span><span class="evidence-claim">声明 #1</span></div><div class="evidence-body"><div class="evidence-title">检索问题：口服胶原蛋白的有效性是否存在争议</div><div class="evidence-content">口服胶原蛋白有效性存争议：质疑方认为其分解为氨基酸与其他蛋白质无本质区别；支持方有临床研究显示对皮肤指标有改善，争议核心为吸收后的肽段是否有独特生物活性靶向皮肤，研究倾向支持该假设但机制未完全阐明</div><div class="evidence-credibility"><span class="cred-label">可信度</span><div class="cred-bar"><div class="cred-fill high" style="width:85%"></div></div><span class="cred-value">85/100</span></div></div><div class="evidence-footer"><span class="evidence-source">搜索检索结果</span></div></div>
+</section>
+<section id="section-verdict" class="chapter">
+<h2 id="verdict">综合判定</h2><p>针对原声明“口服胶原蛋白是有效的”，经核查判定为not_supported，置信度为50。该声明属于绝对化表述，未限定适用条件，无法被现有证据完全支持，且与多方权威信息不符。</p><ul><li><p>支持方多项临床研究表明，持续口服水解胶原蛋白（每日5-10g，8-12周）可改善皮肤水分、弹性、皱纹深度，机制为特定肽段刺激皮肤成纤维细胞合成胶原蛋白。</p></li><li><p>质疑方认为胶原蛋白进入消化道后分解为氨基酸，与其他蛋白质无本质区别，且效果受分子形态、配方、个体状态等限制，并非对所有人有效，机制尚未完全阐明。</p></li></ul>
+</section>
+<section id="section-appendix" class="chapter">
+<h2 id="sec-appendix">报告附注</h2><p>本报告的核查运行唯一标识为：20260623_115051_a2d0；报告生成时间为：2026-06-23T11:54:27；本次核查所针对的原始主张为：口服胶原蛋白是有效的。</p>
+</section>
+</body>
+</html>

@@ -104,7 +104,7 @@ class LLMReportGenerator:
         # 1. 设计布局
         layout = self._design_layout()
 
-        # 2. 逐章生成结构化 IR
+        # 2. 逐章生成结构化 IR（单章失败不影响其他章）
         try:
             document_ir = self._generate_structured_report(layout)
             # 3. 用 IR 感知的渲染器输出
@@ -113,9 +113,13 @@ class LLMReportGenerator:
             content = renderer.render_ir(document_ir)
         except Exception as e:
             logger.warning("结构化 IR 生成失败，降级为 Markdown 模式: %s", e)
-            # 降级：回到原有流程
+            # 降级：调用一次 LLM 生成完整 Markdown
             full_payload = self._build_full_payload(layout)
-            report_content = self._generate_report_markdown(full_payload)
+            try:
+                report_content = self._generate_report_markdown(full_payload)
+            except Exception as md_e:
+                logger.warning("Markdown 降级也失败: %s", md_e)
+                report_content = self._generate_report_fallback_text(layout)
             renderer_cls = get_renderer(renderer_name)
             renderer = renderer_cls()
             content = renderer.render_llm(report_content, layout)
@@ -182,7 +186,10 @@ class LLMReportGenerator:
     # ================================================================
 
     def _generate_structured_report(self, layout: Dict[str, Any]) -> Dict[str, Any]:
-        """逐章调用 LLM 生成结构化 IR，组装为文档 IR"""
+        """逐章调用 LLM 生成结构化 IR，组装为文档 IR
+
+        单章失败不影响其他章——失败章节使用 fallback blocks。
+        """
         data = self.data
         result = data.result
         chapter_guidance = layout.get("chapterGuidance", {})
@@ -200,10 +207,14 @@ class LLMReportGenerator:
             data_packet = chapter_data.get(chap_id, {})
             guidance = chapter_guidance.get(chap_id, "")
 
-            # 调用 LLM 生成该章的 blocks
-            blocks = self._generate_chapter_blocks(
-                chap_title, chap_id, data_packet, guidance, layout
-            )
+            # 调用 LLM 生成该章的 blocks（失败不抛异常，用 fallback）
+            blocks = None
+            try:
+                blocks = self._generate_chapter_blocks(
+                    chap_title, chap_id, data_packet, guidance, layout
+                )
+            except Exception as e:
+                logger.warning("章节 '%s' IR 生成失败: %s", chap_title, e)
 
             if blocks:
                 chapter_ir = {
@@ -212,11 +223,13 @@ class LLMReportGenerator:
                     "anchor": chap_anchor,
                     "blocks": blocks,
                 }
-                # 校验
                 errors = validate_chapter_ir(chapter_ir)
                 if errors:
                     logger.warning("章节 %s 校验警告: %s", chap_title, errors)
                 chapters.append(chapter_ir)
+            else:
+                # 该章生成失败，用 fallback blocks
+                chapters.append(self._build_fallback_chapter(chap_title, chap_anchor, data_packet))
 
         return build_document_ir(
             title=layout.get("title", "事实核查报告"),
@@ -225,6 +238,33 @@ class LLMReportGenerator:
             key_findings=layout.get("keyFindings", []),
             chapters=chapters,
         )
+
+    def _build_fallback_chapter(self, title: str, anchor: str, data_packet: Dict[str, Any]) -> Dict[str, Any]:
+        """当某章 IR 生成失败时，构造 fallback 章节"""
+        blocks: List[Dict[str, Any]] = [
+            {"type": "heading", "level": 2, "text": title, "anchor": anchor},
+        ]
+        # 尝试从数据包中提取内容生成 fallback paragraph
+        if data_packet.get("claim"):
+            blocks.append({"type": "paragraph", "inlines": [{"text": data_packet["claim"]}]})
+        if data_packet.get("claims"):
+            items = []
+            for c in data_packet["claims"]:
+                items.append([{"type": "paragraph", "inlines": [{"text": f"声明 {c['order']}：{c['text']}"}]}])
+            blocks.append({"type": "list", "listType": "bullet", "items": items})
+        if data_packet.get("evidences"):
+            for ev in data_packet["evidences"]:
+                blocks.append({
+                    "type": "evidenceCard",
+                    "claimOrder": ev.get("claimOrder", 1),
+                    "title": ev.get("title", "检索证据"),
+                    "content": (ev.get("content") or "")[:200],
+                    "source": ev.get("source", "搜索检索结果"),
+                    "url": ev.get("url", ""),
+                    "relationType": ev.get("relation", "neutral"),
+                    "credibilityScore": ev.get("credibility"),
+                })
+        return {"chapterId": anchor, "title": title, "anchor": anchor, "blocks": blocks}
 
     def _build_chapter_data_packets(self) -> Dict[str, Any]:
         """为每个章节准备对应的数据子集——每章只传该章独有的数据"""
@@ -352,8 +392,6 @@ class LLMReportGenerator:
 
     def _generate_report_markdown(self, payload: Dict[str, Any]) -> str:
         """LLM 生成完整 Markdown 报告（降级用）"""
-        from .prompts.prompts import SYSTEM_PROMPT_FULL_REPORT
-        # 如果 FULL_REPORT prompt 已被移除，动态构造一个简单的
         fallback_prompt = """
 你是一个专业的事实核查报告撰写专家。你将收到一次事实核查的完整结构化数据，
 需要生成一份内容丰富、结构清晰的 Markdown 格式事实核查报告。
@@ -382,6 +420,34 @@ class LLMReportGenerator:
 """
         user_prompt = json.dumps(payload, ensure_ascii=False, indent=2)
         return self.llm.generate(fallback_prompt, user_prompt)
+
+    def _generate_report_fallback_text(self, layout: Dict[str, Any]) -> str:
+        """最坏情况降级：不用 LLM，直接拼凑文本"""
+        data = self.data
+        result = data.result
+        parts = [
+            f"# {layout.get('title', '事实核查报告')}",
+            "",
+            layout.get("summary", ""),
+            "",
+            "## 声明拆解",
+        ]
+        for c in data.claims:
+            parts.append(f"- 声明 {c.claimOrder}：{c.claimText}")
+        parts.extend(["", "## 证据分析"])
+        for e in data.evidences:
+            parts.append(f"- [{e.relationType}] {e.evidenceTitle}（{e.sourceName}）")
+            if e.evidenceContent:
+                parts[-1] += f"：{e.evidenceContent[:200]}"
+        if result:
+            parts.extend([
+                "",
+                "## 综合判定",
+                f"**判定**：{result.resultLabel}",
+                f"**置信度**：{result.confidenceScore}/100" if result.confidenceScore else "",
+                f"**结论**：{result.conclusion}",
+            ])
+        return "\n".join(parts)
 
     # ================================================================
     # 工具方法
