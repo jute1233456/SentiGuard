@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
@@ -518,6 +518,18 @@
 
     .dialog.confirm-dialog {
       width: min(460px, 100%);
+    }
+    .dialog.report-dialog {
+      width: min(1120px, 100%);
+      height: min(820px, calc(100vh - 48px));
+    }
+
+    .report-frame {
+      flex: 1;
+      width: 100%;
+      min-height: 0;
+      border: 0;
+      background: #ffffff;
     }
 
     .dialog-head {
@@ -1305,6 +1317,19 @@
     </section>
   </div>
 
+  <div id="reportPreviewModal" class="modal" aria-hidden="true">
+    <section class="dialog report-dialog" role="dialog" aria-modal="true" aria-labelledby="reportPreviewTitle">
+      <div class="dialog-head">
+        <div>
+          <h2 id="reportPreviewTitle" class="dialog-title">核查报告预览</h2>
+          <div id="reportPreviewSub" class="dialog-sub">以 HTML 形式查看完整报告</div>
+        </div>
+        <button id="closeReportPreviewBtn" class="btn ghost icon" type="button" aria-label="关闭">×</button>
+      </div>
+      <iframe id="reportPreviewFrame" class="report-frame" title="核查报告 HTML 预览" sandbox></iframe>
+    </section>
+  </div>
+
   <div id="confirmModal" class="modal" aria-hidden="true">
     <section class="dialog confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
       <div class="dialog-head">
@@ -1351,6 +1376,10 @@
       confirmCloseBtn: document.getElementById('confirmCloseBtn'),
       confirmCancelBtn: document.getElementById('confirmCancelBtn'),
       confirmOkBtn: document.getElementById('confirmOkBtn'),
+      reportPreviewModal: document.getElementById('reportPreviewModal'),
+      reportPreviewSub: document.getElementById('reportPreviewSub'),
+      reportPreviewFrame: document.getElementById('reportPreviewFrame'),
+      closeReportPreviewBtn: document.getElementById('closeReportPreviewBtn'),
       toast: document.getElementById('toast')
     };
 
@@ -1525,6 +1554,7 @@
                   <td>
                     <div class="row-actions">
                       <button class="btn ghost view-btn" type="button" data-task-id="${escapeHtml(item.taskId)}">详情</button>
+                      <button class="btn ghost preview-report-btn" type="button" data-task-id="${escapeHtml(item.taskId)}">预览报告</button>
                     </div>
                   </td>
                 </tr>
@@ -1536,6 +1566,9 @@
 
       el.tableContainer.querySelectorAll('.view-btn').forEach(btn => {
         btn.addEventListener('click', () => openDetail(Number(btn.dataset.taskId)));
+      });
+      el.tableContainer.querySelectorAll('.preview-report-btn').forEach(btn => {
+        btn.addEventListener('click', () => previewReportByTask(Number(btn.dataset.taskId)));
       });
     }
 
@@ -1677,7 +1710,6 @@
               </div>
             </div>
             <button id="modalRerunBtn" class="btn" type="button">重新核查</button>
-            <button id="copyConclusionBtn" class="btn ghost" type="button">复制结论</button>
             <button id="exportReportBtn" class="btn ghost" type="button">导出报告</button>
             <button id="modalDeleteBtn" class="btn danger" type="button">删除记录</button>
           </aside>
@@ -1686,10 +1718,56 @@
 
       document.getElementById('modalRerunBtn').addEventListener('click', () => rerunTask(detail.taskId));
       document.getElementById('modalDeleteBtn').addEventListener('click', () => askDeleteTask(detail.taskId));
-      document.getElementById('copyConclusionBtn').addEventListener('click', copyConclusion);
       document.getElementById('exportReportBtn').addEventListener('click', exportReport);
     }
 
+
+    function getReportContent(detail) {
+      const report = detail && detail.report ? detail.report : {};
+      return report.content || report.reportContent || '';
+    }
+
+    function buildReportPreviewHtml(content) {
+      const value = String(content || '').trim();
+      if (!value) {
+        return '<!doctype html><html lang="zh-CN"><body style="font-family: Microsoft YaHei, Arial, sans-serif; padding: 32px; color: #63748a;">暂无报告内容</body></html>';
+      }
+      if (/<!doctype|<html[\s>]/i.test(value)) {
+        return value;
+      }
+      return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>body{margin:0;padding:32px;font-family:"Microsoft YaHei",Arial,sans-serif;color:#152235;background:#fff;line-height:1.75;}img,table{max-width:100%;}table{border-collapse:collapse;}td,th{border:1px solid #dbe5ee;padding:8px 10px;}h1,h2,h3{color:#105986;}</style></head><body>${value}</body></html>`;
+    }
+
+    function previewReport(detail) {
+      const content = getReportContent(detail);
+      if (!String(content).trim()) {
+        showToast('暂无可预览的核查报告', 'error');
+        return;
+      }
+      el.reportPreviewSub.textContent = `任务 #${detail.taskId || '-'} · HTML 报告预览`;
+      el.reportPreviewFrame.srcdoc = buildReportPreviewHtml(content);
+      el.reportPreviewModal.classList.add('show');
+      el.reportPreviewModal.setAttribute('aria-hidden', 'false');
+      document.body.style.overflow = 'hidden';
+    }
+
+    async function previewReportByTask(taskId) {
+      try {
+        const detail = await requestJson(`/api/fact-check/tasks/${taskId}`);
+        previewReport(detail);
+      } catch (error) {
+        showToast(error.message, 'error');
+      }
+    }
+
+    function closeReportPreview() {
+      el.reportPreviewModal.classList.remove('show');
+      el.reportPreviewModal.setAttribute('aria-hidden', 'true');
+      el.reportPreviewFrame.srcdoc = '';
+      if (!el.detailModal.classList.contains('show') && !el.confirmModal.classList.contains('show')) {
+        document.body.style.overflow = '';
+      }
+    }
     async function rerunTask(taskId) {
       if (rerunningTaskId) return;
       try {
@@ -1742,34 +1820,6 @@
       } finally {
         el.confirmOkBtn.disabled = false;
         el.confirmOkBtn.textContent = '确认删除';
-      }
-    }
-
-    async function copyConclusion() {
-      if (!currentDetail) return;
-      const result = currentDetail.result || {};
-      const text = [
-        `任务编号：#${currentDetail.taskId || '-'}`,
-        `核查结论：${result.conclusion || '暂无结论'}`,
-        `分析说明：${result.analysisDetail || '暂无详细分析说明'}`
-      ].join('\n');
-
-      try {
-        if (navigator.clipboard && window.isSecureContext) {
-          await navigator.clipboard.writeText(text);
-        } else {
-          const textarea = document.createElement('textarea');
-          textarea.value = text;
-          textarea.style.position = 'fixed';
-          textarea.style.left = '-9999px';
-          document.body.appendChild(textarea);
-          textarea.select();
-          document.execCommand('copy');
-          textarea.remove();
-        }
-        showToast('结论已复制');
-      } catch (error) {
-        showToast('复制失败，请手动选择内容', 'error');
       }
     }
 
@@ -1852,6 +1902,7 @@
 
     el.refreshBtn.addEventListener('click', loadHistory);
     el.closeModalBtn.addEventListener('click', closeModal);
+    el.closeReportPreviewBtn.addEventListener('click', closeReportPreview);
     el.confirmCloseBtn.addEventListener('click', closeConfirmModal);
     el.confirmCancelBtn.addEventListener('click', closeConfirmModal);
     el.confirmOkBtn.addEventListener('click', performDeleteTask);
@@ -1861,9 +1912,13 @@
     el.confirmModal.addEventListener('click', event => {
       if (event.target === el.confirmModal) closeConfirmModal();
     });
+    el.reportPreviewModal.addEventListener('click', event => {
+      if (event.target === el.reportPreviewModal) closeReportPreview();
+    });
     document.addEventListener('keydown', event => {
       if (event.key === 'Escape') {
-        if (el.confirmModal.classList.contains('show')) closeConfirmModal();
+        if (el.reportPreviewModal.classList.contains('show')) closeReportPreview();
+        else if (el.confirmModal.classList.contains('show')) closeConfirmModal();
         else closeModal();
       }
     });

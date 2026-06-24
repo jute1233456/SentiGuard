@@ -1,4 +1,4 @@
-﻿server:
+server:
   port: 8080
 
 spring:
@@ -32,6 +32,8 @@ sentiguard:
   agent:
     base-url: ${SENTIGUARD_AGENT_BASE_URL:http://127.0.0.1:8000}
     fact-check-path: /internal/v1/fact-check/detail/db
+    quick-fact-check-path: /internal/v1/fact-check/quick
+    deep-fact-check-path: /internal/v1/fact-check/deep
     internal-token: ${SENTIGUARD_INTERNAL_TOKEN:dev-internal-token}
     connect-timeout-ms: 10000
     read-timeout-ms: 300000

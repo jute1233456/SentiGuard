@@ -301,11 +301,18 @@ def _build_quick_response(agent: FactAgent, req: FactCheckRequest) -> FactCheckD
 
     # 数据驱动 HTML 报告
     report_data = _build_report_data_from_f3(claims, evidence_items, f3_result, agent.trace, req.claim.strip())
-    report_result = ReportGenerator(report_data).generate(renderer_name="html")
+    try:
+        report_result = LLMReportGenerator(report_data).generate(renderer_name="html")
+        report_format = "html"
+    except Exception:
+        logging.getLogger("fact_check").warning("LLM report generation failed, fallback to data-driven template", exc_info=True)
+        report_result = ReportGenerator(report_data).generate(renderer_name="html")
+        report_format = "html"
+
     f3_report = F3Report(
         reportTitle=report_result.title,
         reportContent=report_result.content,
-        reportFormat="html",
+        reportFormat=report_format,
     )
 
     return FactCheckDetailDBData(

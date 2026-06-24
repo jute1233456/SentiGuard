@@ -13,4 +13,5 @@ public class FactCheckAnalyzeDTO {
 
     @NotBlank(message = "核查内容不能为空")
     private String inputText;
+    private String checkMode = "quick";
 }

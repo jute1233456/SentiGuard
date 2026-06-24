@@ -12,4 +12,5 @@ public class AgentCheckRequest {
     private Long hotEventId;
 
     private String inputText;
+    private String checkMode = "quick";
 }
