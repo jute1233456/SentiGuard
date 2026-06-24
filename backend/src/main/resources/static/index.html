@@ -1441,14 +1441,10 @@
     }
 
     #resetBtn {
-      grid-column: 3;
-    }
-
-    #quickAnalyzeBtn {
       grid-column: 4;
     }
 
-    #deepAnalyzeBtn {
+    #analyzeBtn {
       grid-column: 5;
     }
 
@@ -1718,6 +1714,105 @@
       background: #187c86;
     }
 
+
+    .check-mode-selector {
+      position: relative;
+      grid-column: 3;
+      justify-self: end;
+    }
+
+    .mode-select-trigger {
+      min-width: 128px;
+      height: 42px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 0 14px;
+      border: 1px solid #c8d7e3;
+      border-radius: 8px;
+      color: #15384f;
+      background: #ffffff;
+      font-weight: 900;
+      box-shadow: 0 8px 18px rgba(15, 38, 55, 0.06);
+    }
+
+    .mode-select-trigger:disabled {
+      opacity: 0.58;
+      cursor: not-allowed;
+    }
+
+    .mode-select-icon {
+      width: 18px;
+      display: inline-flex;
+      justify-content: center;
+      color: #0f7d86;
+      font-weight: 900;
+    }
+
+    .mode-select-caret {
+      color: #7a8b9c;
+      font-size: 13px;
+    }
+
+    .mode-select-menu {
+      position: absolute;
+      right: 0;
+      bottom: calc(100% + 10px);
+      z-index: 40;
+      width: 292px;
+      display: none;
+      padding: 8px;
+      border: 1px solid #dbe5ee;
+      border-radius: 10px;
+      background: #ffffff;
+      box-shadow: 0 20px 46px rgba(15, 38, 55, 0.18);
+    }
+
+    .check-mode-selector.open .mode-select-menu {
+      display: grid;
+      gap: 4px;
+    }
+
+    .mode-select-option {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 24px minmax(0, 1fr) 20px;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 9px;
+      border-radius: 8px;
+      color: #16364d;
+      background: transparent;
+      text-align: left;
+    }
+
+    .mode-select-option:hover,
+    .mode-select-option.active {
+      background: #f3f8fb;
+    }
+
+    .mode-select-option strong,
+    .mode-select-option small {
+      display: block;
+      line-height: 1.35;
+    }
+
+    .mode-select-option small {
+      margin-top: 3px;
+      color: #8a98a8;
+      font-weight: 700;
+    }
+
+    .mode-selected-mark {
+      visibility: hidden;
+      color: #0b1f2d;
+      font-weight: 900;
+    }
+
+    .mode-select-option.active .mode-selected-mark {
+      visibility: visible;
+    }
     .mode-view {
       display: none;
       min-height: 0;
@@ -2110,8 +2205,7 @@
 
       .advanced-toggle,
       #resetBtn,
-      #quickAnalyzeBtn,
-      #deepAnalyzeBtn,
+      #analyzeBtn,
       .input-panel.show-advanced .advanced-toggle {
         grid-column: auto;
         justify-self: stretch;
@@ -2380,14 +2474,7 @@
           <div id="metricClaims">0</div>
           <div id="metricEvidence">0</div>
         </section>
-
-        <div class="mode-switch" role="tablist" aria-label="核查模式">
-          <button id="standardModeBtn" class="mode-tab active" type="button">标准核查</button>
-          <button id="dialogModeBtn" class="mode-tab" type="button">对话引导</button>
-        </div>
-
-        <section id="standardMode" class="mode-view active">
-        <section class="workspace compact-workspace">
+<section class="workspace compact-workspace">
           <div id="inputPanel" class="panel input-panel">
             <div class="panel-head">
               <div>
@@ -2408,9 +2495,27 @@
                     <input id="hotEventId" type="number" min="1" placeholder="可选">
                   </div>
                   <button id="advancedToggle" class="btn ghost advanced-toggle" type="button">高级选项</button>
+                  <div id="checkModeSelector" class="check-mode-selector">
+                    <button id="modeSelectBtn" class="mode-select-trigger" type="button" aria-haspopup="true" aria-expanded="false">
+                      <span id="modeSelectIcon" class="mode-select-icon">↯</span>
+                      <span id="modeSelectText" class="mode-select-text">快速核查</span>
+                      <span class="mode-select-caret">⌄</span>
+                    </button>
+                    <div id="modeSelectMenu" class="mode-select-menu" role="menu">
+                      <button class="mode-select-option active" type="button" data-check-mode="quick" role="menuitem">
+                        <span class="mode-select-icon">↯</span>
+                        <span><strong>快速核查</strong><small>适用于大部分情况</small></span>
+                        <span class="mode-selected-mark">✓</span>
+                      </button>
+                      <button class="mode-select-option" type="button" data-check-mode="deep" role="menuitem">
+                        <span class="mode-select-icon">✣</span>
+                        <span><strong>深度核查</strong><small>多轮反思与完整证据检索</small></span>
+                        <span class="mode-selected-mark">✓</span>
+                      </button>
+                    </div>
+                  </div>
                   <button id="resetBtn" class="btn ghost" type="button">重置</button>
-                  <button id="quickAnalyzeBtn" class="btn ghost" type="submit" data-check-mode="quick">快速核查</button>
-                  <button id="deepAnalyzeBtn" class="btn" type="submit" data-check-mode="deep">深度核查</button>
+                  <button id="analyzeBtn" class="btn" type="submit">开始核查</button>
                 </div>
               </form>
             </div>
@@ -2435,38 +2540,6 @@
           </div>
         </section>
         </section>
-
-        <section id="dialogMode" class="mode-view">
-          <div class="panel dialog-panel">
-            <div class="panel-head">
-              <div>
-                <div class="panel-title">对话引导</div>
-                <div class="panel-sub">用于澄清问题并生成可核查陈述</div>
-              </div>
-              <span class="badge">待接入</span>
-            </div>
-            <div class="panel-body dialog-body">
-              <div class="chat-shell">
-                <div class="chat-feed">
-                  <div class="chat-bubble">请输入需要核查的问题。接入后，助手会先判断是否适合事实核查，再整理为可提交的核查陈述。</div>
-                </div>
-                <div class="chat-compose">
-                  <input type="text" placeholder="例如：北大好吗？" disabled>
-                  <button class="btn" type="button" disabled>待接入</button>
-                </div>
-              </div>
-              <div class="guide-card">
-                <div class="guide-title">接入规划</div>
-                <ul class="guide-list">
-                  <li>识别主观问题、模糊问题和事实陈述。</li>
-                  <li>通过多轮对话补全时间、主体、事件等要素。</li>
-                  <li>生成标准核查陈述后进入现有核查流程。</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </section>
-      </section>
     </main>
   </div>
 
@@ -2486,16 +2559,16 @@
     const el = {
       backendStatus: document.getElementById('backendStatus'),
       dbStatus: document.getElementById('dbStatus'),
-      standardModeBtn: document.getElementById('standardModeBtn'),
-      dialogModeBtn: document.getElementById('dialogModeBtn'),
-      standardMode: document.getElementById('standardMode'),
-      dialogMode: document.getElementById('dialogMode'),
+      checkModeSelector: document.getElementById('checkModeSelector'),
+      modeSelectBtn: document.getElementById('modeSelectBtn'),
+      modeSelectMenu: document.getElementById('modeSelectMenu'),
+      modeSelectText: document.getElementById('modeSelectText'),
+      modeSelectIcon: document.getElementById('modeSelectIcon'),
       form: document.getElementById('checkForm'),
       inputPanel: document.getElementById('inputPanel'),
       inputText: document.getElementById('inputText'),
       hotEventId: document.getElementById('hotEventId'),
-      quickAnalyzeBtn: document.getElementById('quickAnalyzeBtn'),
-      deepAnalyzeBtn: document.getElementById('deepAnalyzeBtn'),
+      analyzeBtn: document.getElementById('analyzeBtn'),
       resetBtn: document.getElementById('resetBtn'),
       advancedToggle: document.getElementById('advancedToggle'),
       exportBtn: document.getElementById('exportBtn'),
@@ -2517,6 +2590,7 @@
     };
 
     let currentDetail = null;
+    let selectedCheckMode = 'quick';
     el.inputPanel.classList.remove('show-advanced', 'has-result');
 
     function getToken() {
@@ -2690,12 +2764,33 @@
         || text.includes('SentiGuard 智能体');
     }
 
-    function setMode(mode) {
-      const isDialog = mode === 'dialog';
-      el.standardModeBtn.classList.toggle('active', !isDialog);
-      el.dialogModeBtn.classList.toggle('active', isDialog);
-      el.standardMode.classList.toggle('active', !isDialog);
-      el.dialogMode.classList.toggle('active', isDialog);
+    function setCheckMode(mode) {
+      selectedCheckMode = mode === 'deep' ? 'deep' : 'quick';
+      const isDeep = selectedCheckMode === 'deep';
+      el.modeSelectText.textContent = isDeep ? '深度核查' : '快速核查';
+      el.modeSelectIcon.textContent = isDeep ? '✣' : '↯';
+      el.modeSelectMenu.querySelectorAll('.mode-select-option').forEach(option => {
+        option.classList.toggle('active', option.dataset.checkMode === selectedCheckMode);
+      });
+      closeModeMenu();
+    }
+
+    function openModeMenu() {
+      el.checkModeSelector.classList.add('open');
+      el.modeSelectBtn.setAttribute('aria-expanded', 'true');
+    }
+
+    function closeModeMenu() {
+      el.checkModeSelector.classList.remove('open');
+      el.modeSelectBtn.setAttribute('aria-expanded', 'false');
+    }
+
+    function toggleModeMenu() {
+      if (el.checkModeSelector.classList.contains('open')) {
+        closeModeMenu();
+      } else {
+        openModeMenu();
+      }
     }
 
     function buildExportContent(detail) {
@@ -2842,9 +2937,7 @@
         showToast('请输入待核查内容', 'error');
         return;
       }
-
-      const submitter = event.submitter;
-      const checkMode = submitter && submitter.dataset.checkMode === 'deep' ? 'deep' : 'quick';
+      const checkMode = selectedCheckMode;
       const endpoint = checkMode === 'deep' ? '/api/fact-check/analyze/deep' : '/api/fact-check/analyze/quick';
       const payload = { inputText, checkMode };
       if (el.hotEventId.value) {
@@ -2873,10 +2966,9 @@
     }
 
     function setAnalyzeButtonsLoading(loading, mode) {
-      el.quickAnalyzeBtn.disabled = loading;
-      el.deepAnalyzeBtn.disabled = loading;
-      el.quickAnalyzeBtn.textContent = loading && mode === 'quick' ? '快速核查中...' : '快速核查';
-      el.deepAnalyzeBtn.textContent = loading && mode === 'deep' ? '深度核查中...' : '深度核查';
+      el.analyzeBtn.disabled = loading;
+      el.modeSelectBtn.disabled = loading;
+      el.analyzeBtn.textContent = loading ? (mode === 'deep' ? '深度核查中...' : '快速核查中...') : '开始核查';
     }
 
     function clearResultForLoading() {
@@ -2979,8 +3071,13 @@
     }
 
     el.form.addEventListener('submit', analyze);
-    el.standardModeBtn.addEventListener('click', () => setMode('standard'));
-    el.dialogModeBtn.addEventListener('click', () => setMode('dialog'));
+    el.modeSelectBtn.addEventListener('click', toggleModeMenu);
+    el.modeSelectMenu.querySelectorAll('.mode-select-option').forEach(option => {
+      option.addEventListener('click', () => setCheckMode(option.dataset.checkMode));
+    });
+    document.addEventListener('click', event => {
+      if (!el.checkModeSelector.contains(event.target)) closeModeMenu();
+    });
     el.resetBtn.addEventListener('click', resetPage);
     el.advancedToggle.addEventListener('click', toggleAdvancedOptions);
     el.exportBtn.addEventListener('click', exportDetail);

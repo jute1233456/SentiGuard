@@ -1,10 +1,15 @@
 package com.sentiguard.backend.controller;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 
 import javax.validation.Valid;
 
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -20,7 +25,9 @@ import com.sentiguard.backend.dto.FactCheckAnalyzeDTO;
 import com.sentiguard.backend.dto.HistoryQueryDTO;
 import com.sentiguard.backend.entity.User;
 import com.sentiguard.backend.service.FactCheckService;
+import com.sentiguard.backend.service.HtmlReportPdfService;
 import com.sentiguard.backend.service.UserService;
+import com.sentiguard.backend.vo.AnalysisReportVO;
 import com.sentiguard.backend.vo.FactCheckDetailVO;
 import com.sentiguard.backend.vo.HistoryVO;
 
@@ -30,10 +37,14 @@ public class FactCheckController {
 
     private final FactCheckService factCheckService;
     private final UserService userService;
+    private final HtmlReportPdfService htmlReportPdfService;
 
-    public FactCheckController(FactCheckService factCheckService, UserService userService) {
+    public FactCheckController(FactCheckService factCheckService,
+                               UserService userService,
+                               HtmlReportPdfService htmlReportPdfService) {
         this.factCheckService = factCheckService;
         this.userService = userService;
+        this.htmlReportPdfService = htmlReportPdfService;
     }
 
     @PostMapping("/analyze")
@@ -88,7 +99,18 @@ public class FactCheckController {
         query.setPageSize(pageSize);
         return Result.ok(factCheckService.getHistory(query));
     }
-
+    @GetMapping("/report/{taskId}/pdf")
+    public ResponseEntity<byte[]> exportReportPdf(@PathVariable Long taskId) {
+        AnalysisReportVO report = factCheckService.getReportByTaskId(taskId);
+        byte[] pdfBytes = htmlReportPdfService.renderPdf(report.getContent());
+        String filename = "fact-check-report-" + taskId + ".pdf";
+        String encodedFilename = URLEncoder.encode(filename, StandardCharsets.UTF_8).replace("+", "%20");
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + filename + "\"; filename*=UTF-8''" + encodedFilename)
+                .body(pdfBytes);
+    }
     @PostMapping("/tasks/{taskId}/rerun")
     public Result<FactCheckDetailVO> rerun(@PathVariable Long taskId) {
         return Result.ok(factCheckService.rerun(taskId));

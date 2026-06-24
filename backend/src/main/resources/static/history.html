@@ -1643,7 +1643,6 @@
       const result = detail.result || {};
       const claims = detail.claims || [];
       const evidences = detail.evidences || [];
-      const report = detail.report || {};
 
       el.dialogSub.textContent = `任务 #${detail.taskId || '-'} · ${formatTime(detail.finishTime || detail.submitTime)}`;
       el.detailBody.innerHTML = `
@@ -1686,11 +1685,6 @@
                   ${evidenceUrl ? `<div class="muted"><a href="${escapeHtml(evidenceUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(evidenceUrl)}</a></div>` : ''}
                 </div>
               `}).join('') : '<div class="muted">暂无证据材料。</div>'}
-            </div>
-
-            <div class="detail-block">
-              <div class="detail-title">核查报告</div>
-              <div class="detail-text">${escapeHtml(report.content || '暂无报告内容')}</div>
             </div>
           </div>
 
@@ -1823,39 +1817,54 @@
       }
     }
 
-    function exportReport() {
-      if (!currentDetail) return;
-      const result = currentDetail.result || {};
-      const report = currentDetail.report || {};
-      const content = [
-        'SentiGuard 核查报告',
-        `任务编号：#${currentDetail.taskId || '-'}`,
-        `提交时间：${formatTime(currentDetail.submitTime)}`,
-        `完成时间：${formatTime(currentDetail.finishTime)}`,
-        '',
-        '核查内容：',
-        currentDetail.inputText || '-',
-        '',
-        '核查结论：',
-        result.conclusion || '暂无结论',
-        '',
-        '分析说明：',
-        result.analysisDetail || '暂无详细分析说明',
-        '',
-        '报告内容：',
-        report.content || '暂无报告内容'
-      ].join('\n');
-
-      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `sentiguard-report-${currentDetail.taskId || 'detail'}.txt`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
-      showToast('报告已导出');
+    async function exportReport() {
+      if (!currentDetail || !currentDetail.taskId) return;
+      const taskId = currentDetail.taskId;
+      const button = document.getElementById('exportReportBtn');
+      const originalText = button ? button.textContent : '';
+      try {
+        if (button) {
+          button.disabled = true;
+          button.textContent = '导出中...';
+        }
+        const token = localStorage.getItem('sg_token');
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        const response = await fetch(`/api/fact-check/report/${taskId}/pdf`, { headers });
+        if (response.status === 401) {
+          localStorage.removeItem('sg_token');
+          localStorage.removeItem('sg_token_type');
+          window.location.href = '/login.html';
+          throw new Error('请先登录');
+        }
+        const contentType = response.headers.get('content-type') || '';
+        if (!response.ok || !contentType.includes('application/pdf')) {
+          let message = 'PDF 报告导出失败';
+          try {
+            const body = await response.json();
+            message = body.message || message;
+          } catch (ignored) {
+            // 非 JSON 错误响应时使用默认提示。
+          }
+          throw new Error(message);
+        }
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `核查报告-${taskId}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+        showToast('PDF 报告已导出');
+      } catch (error) {
+        showToast(error.message || 'PDF 报告导出失败', 'error');
+      } finally {
+        if (button) {
+          button.disabled = false;
+          button.textContent = originalText || '导出报告';
+        }
+      }
     }
 
     function scheduleLoad() {
