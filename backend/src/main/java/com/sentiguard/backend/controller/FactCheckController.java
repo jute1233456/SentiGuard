@@ -38,8 +38,23 @@ public class FactCheckController {
 
     @PostMapping("/analyze")
     public Result<FactCheckDetailVO> analyze(@Valid @RequestBody FactCheckAnalyzeDTO dto) {
+        return analyzeWithMode(dto, dto.getCheckMode());
+    }
+
+    @PostMapping("/analyze/quick")
+    public Result<FactCheckDetailVO> analyzeQuick(@Valid @RequestBody FactCheckAnalyzeDTO dto) {
+        return analyzeWithMode(dto, "quick");
+    }
+
+    @PostMapping("/analyze/deep")
+    public Result<FactCheckDetailVO> analyzeDeep(@Valid @RequestBody FactCheckAnalyzeDTO dto) {
+        return analyzeWithMode(dto, "deep");
+    }
+
+    private Result<FactCheckDetailVO> analyzeWithMode(FactCheckAnalyzeDTO dto, String checkMode) {
         User currentUser = userService.getCurrentUser();
         dto.setUserId(currentUser.getId());
+        dto.setCheckMode(checkMode);
         return Result.ok(factCheckService.analyze(dto));
     }
 

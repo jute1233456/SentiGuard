@@ -299,11 +299,18 @@ def _build_quick_response(agent: FactAgent, req: FactCheckRequest) -> FactCheckD
 
     # 数据驱动 HTML 报告
     report_data = _build_report_data_from_f3(claims, evidence_items, f3_result, agent.trace, req.claim.strip())
-    report_result = ReportGenerator(report_data).generate(renderer_name="html")
+    try:
+        report_result = LLMReportGenerator(report_data).generate(renderer_name="html")
+        report_format = "html"
+    except Exception:
+        logging.getLogger("fact_check").warning("LLM report generation failed, fallback to data-driven template", exc_info=True)
+        report_result = ReportGenerator(report_data).generate(renderer_name="html")
+        report_format = "html"
+
     f3_report = F3Report(
         reportTitle=report_result.title,
         reportContent=report_result.content,
-        reportFormat="html",
+        reportFormat=report_format,
     )
 
     return FactCheckDetailDBData(
@@ -353,13 +360,8 @@ def _build_deep_response(reflective_agent: ReflectiveFactAgent, req: FactCheckRe
 
     # LLM HTML 报告（失败降级为 Markdown）
     report_data = _build_report_data_from_f3(claims, all_evidence_items, f3_result, reflective_agent.trace, req.claim.strip())
-    try:
-        report_result = LLMReportGenerator(report_data).generate(renderer_name="html")
-        report_format = "html"
-    except Exception:
-        logging.getLogger("fact_check").warning("LLM 报告生成失败，降级为数据驱动模式", exc_info=True)
-        report_result = ReportGenerator(report_data).generate()
-        report_format = "markdown"
+    report_result = ReportGenerator(report_data).generate(renderer_name="html")
+    report_format = "html"
 
     f3_report = F3Report(
         reportTitle=report_result.title,

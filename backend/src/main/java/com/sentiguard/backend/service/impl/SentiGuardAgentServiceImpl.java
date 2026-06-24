@@ -53,7 +53,7 @@ public class SentiGuardAgentServiceImpl implements AgentService {
 
     @Override
     public AgentCheckResponse check(AgentCheckRequest request) {
-        SentiGuardDetailApiResponse apiResponse = callFastApi(request.getInputText());
+        SentiGuardDetailApiResponse apiResponse = callFastApi(request.getInputText(), request.getCheckMode());
         SentiGuardFactCheckDetailData data = apiResponse.getData();
         if (data == null) {
             throw new IllegalStateException("SentiGuard 返回数据为空");
@@ -67,8 +67,8 @@ public class SentiGuardAgentServiceImpl implements AgentService {
         return response;
     }
 
-    private SentiGuardDetailApiResponse callFastApi(String claim) {
-        String url = properties.getBaseUrl() + properties.getFactCheckPath();
+    private SentiGuardDetailApiResponse callFastApi(String claim, String checkMode) {
+        String url = properties.getBaseUrl() + resolveFactCheckPath(checkMode);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -94,6 +94,13 @@ public class SentiGuardAgentServiceImpl implements AgentService {
         } catch (RestClientException ex) {
             throw new IllegalStateException("无法调用 SentiGuard FastAPI：" + ex.getMessage(), ex);
         }
+    }
+
+    private String resolveFactCheckPath(String checkMode) {
+        if ("deep".equalsIgnoreCase(checkMode)) {
+            return properties.getDeepFactCheckPath();
+        }
+        return properties.getQuickFactCheckPath();
     }
 
     private List<AgentClaim> mapClaims(List<SentiGuardClaimData> sourceClaims, String inputText) {

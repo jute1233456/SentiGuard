@@ -83,7 +83,7 @@ public class FactCheckServiceImpl implements FactCheckService {
         taskMapper.insert(task);
 
         try {
-            AgentCheckResponse agentResponse = agentService.check(new AgentCheckRequest(dto.getHotEventId(), dto.getInputText()));
+            AgentCheckResponse agentResponse = agentService.check(new AgentCheckRequest(dto.getHotEventId(), dto.getInputText(), normalizeCheckMode(dto.getCheckMode())));
             Map<Integer, Long> claimIdByOrder = saveClaims(task.getId(), agentResponse.getClaims());
             saveEvidences(task.getId(), claimIdByOrder, agentResponse.getEvidences());
             saveResult(task.getId(), agentResponse);
@@ -199,7 +199,12 @@ public class FactCheckServiceImpl implements FactCheckService {
         dto.setUserId(oldTask.getUserId());
         dto.setHotEventId(oldTask.getHotEventId());
         dto.setInputText(oldTask.getInputText());
+        dto.setCheckMode("quick");
         return analyze(dto);
+    }
+
+    private String normalizeCheckMode(String checkMode) {
+        return "deep".equalsIgnoreCase(checkMode) ? "deep" : "quick";
     }
 
     @Override

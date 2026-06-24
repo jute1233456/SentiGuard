@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
@@ -1423,7 +1423,7 @@
 
     .compact-form-row {
       display: grid;
-      grid-template-columns: minmax(220px, 320px) minmax(0, 1fr) auto auto;
+      grid-template-columns: minmax(220px, 320px) minmax(0, 1fr) auto auto auto;
       justify-content: end;
       gap: 12px;
       align-items: end;
@@ -1444,8 +1444,12 @@
       grid-column: 3;
     }
 
-    #analyzeBtn {
+    #quickAnalyzeBtn {
       grid-column: 4;
+    }
+
+    #deepAnalyzeBtn {
+      grid-column: 5;
     }
 
     .compact-form-row .btn {
@@ -1632,6 +1636,63 @@
       background: #ffffff;
     }
 
+
+    .output-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .report-preview-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 80;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 28px;
+      background: rgba(13, 34, 50, 0.54);
+    }
+
+    .report-preview-modal.show {
+      display: flex;
+    }
+
+    .report-preview-dialog {
+      width: min(1120px, 100%);
+      height: min(820px, calc(100vh - 56px));
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border-radius: 10px;
+      background: #ffffff;
+      box-shadow: 0 28px 80px rgba(15, 38, 55, 0.24);
+    }
+
+    .report-preview-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 16px 20px;
+      border-bottom: 1px solid #dbe5ee;
+    }
+
+    .report-preview-title {
+      margin: 0;
+      color: #0d2d43;
+      font-size: 18px;
+      font-weight: 900;
+    }
+
+    .report-preview-frame {
+      flex: 1;
+      width: 100%;
+      border: 0;
+      background: #ffffff;
+    }
     .mode-switch {
       display: inline-flex;
       width: max-content;
@@ -1794,7 +1855,64 @@
         grid-template-rows: auto minmax(0, 1fr);
       }
 
-      .mode-switch {
+  
+    .output-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .report-preview-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 80;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 28px;
+      background: rgba(13, 34, 50, 0.54);
+    }
+
+    .report-preview-modal.show {
+      display: flex;
+    }
+
+    .report-preview-dialog {
+      width: min(1120px, 100%);
+      height: min(820px, calc(100vh - 56px));
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border-radius: 10px;
+      background: #ffffff;
+      box-shadow: 0 28px 80px rgba(15, 38, 55, 0.24);
+    }
+
+    .report-preview-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 16px 20px;
+      border-bottom: 1px solid #dbe5ee;
+    }
+
+    .report-preview-title {
+      margin: 0;
+      color: #0d2d43;
+      font-size: 18px;
+      font-weight: 900;
+    }
+
+    .report-preview-frame {
+      flex: 1;
+      width: 100%;
+      border: 0;
+      background: #ffffff;
+    }
+    .mode-switch {
         height: 42px;
       }
 
@@ -1992,7 +2110,8 @@
 
       .advanced-toggle,
       #resetBtn,
-      #analyzeBtn,
+      #quickAnalyzeBtn,
+      #deepAnalyzeBtn,
       .input-panel.show-advanced .advanced-toggle {
         grid-column: auto;
         justify-self: stretch;
@@ -2006,7 +2125,64 @@
         grid-template-columns: 1fr;
       }
 
-      .mode-switch {
+  
+    .output-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .report-preview-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 80;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 28px;
+      background: rgba(13, 34, 50, 0.54);
+    }
+
+    .report-preview-modal.show {
+      display: flex;
+    }
+
+    .report-preview-dialog {
+      width: min(1120px, 100%);
+      height: min(820px, calc(100vh - 56px));
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border-radius: 10px;
+      background: #ffffff;
+      box-shadow: 0 28px 80px rgba(15, 38, 55, 0.24);
+    }
+
+    .report-preview-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 16px 20px;
+      border-bottom: 1px solid #dbe5ee;
+    }
+
+    .report-preview-title {
+      margin: 0;
+      color: #0d2d43;
+      font-size: 18px;
+      font-weight: 900;
+    }
+
+    .report-preview-frame {
+      flex: 1;
+      width: 100%;
+      border: 0;
+      background: #ffffff;
+    }
+    .mode-switch {
         width: 100%;
       }
 
@@ -2233,7 +2409,8 @@
                   </div>
                   <button id="advancedToggle" class="btn ghost advanced-toggle" type="button">高级选项</button>
                   <button id="resetBtn" class="btn ghost" type="button">重置</button>
-                  <button id="analyzeBtn" class="btn" type="submit">开始核查</button>
+                  <button id="quickAnalyzeBtn" class="btn ghost" type="submit" data-check-mode="quick">快速核查</button>
+                  <button id="deepAnalyzeBtn" class="btn" type="submit" data-check-mode="deep">深度核查</button>
                 </div>
               </form>
             </div>
@@ -2245,7 +2422,10 @@
                 <div class="panel-title">核查结果</div>
                 <div id="taskMeta" class="panel-sub">提交后展示核查结论</div>
               </div>
-              <button id="exportBtn" class="btn ghost export-btn" type="button" disabled>导出详情</button>
+              <div class="output-actions">
+                <button id="previewReportBtn" class="btn ghost export-btn" type="button" disabled>预览报告</button>
+                <button id="exportBtn" class="btn ghost export-btn" type="button" disabled>导出详情</button>
+              </div>
             </div>
             <div class="panel-body compact-output">
               <div id="resultView" class="empty compact-empty">暂无核查结果</div>
@@ -2292,6 +2472,16 @@
 
   <div id="toast" class="toast"></div>
 
+  <div id="reportPreviewModal" class="report-preview-modal" aria-hidden="true">
+    <section class="report-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="reportPreviewTitle">
+      <div class="report-preview-head">
+        <h2 id="reportPreviewTitle" class="report-preview-title">核查报告预览</h2>
+        <button id="closeReportPreviewBtn" class="btn ghost icon" type="button" aria-label="关闭">×</button>
+      </div>
+      <iframe id="reportPreviewFrame" class="report-preview-frame" title="核查报告 HTML 预览" sandbox></iframe>
+    </section>
+  </div>
+
   <script>
     const el = {
       backendStatus: document.getElementById('backendStatus'),
@@ -2304,10 +2494,15 @@
       inputPanel: document.getElementById('inputPanel'),
       inputText: document.getElementById('inputText'),
       hotEventId: document.getElementById('hotEventId'),
-      analyzeBtn: document.getElementById('analyzeBtn'),
+      quickAnalyzeBtn: document.getElementById('quickAnalyzeBtn'),
+      deepAnalyzeBtn: document.getElementById('deepAnalyzeBtn'),
       resetBtn: document.getElementById('resetBtn'),
       advancedToggle: document.getElementById('advancedToggle'),
       exportBtn: document.getElementById('exportBtn'),
+      previewReportBtn: document.getElementById('previewReportBtn'),
+      reportPreviewModal: document.getElementById('reportPreviewModal'),
+      reportPreviewFrame: document.getElementById('reportPreviewFrame'),
+      closeReportPreviewBtn: document.getElementById('closeReportPreviewBtn'),
       currentUser: document.getElementById('currentUser'),
       logoutBtn: document.getElementById('logoutBtn'),
       resultView: document.getElementById('resultView'),
@@ -2557,6 +2752,44 @@
       return lines.join('\n');
     }
 
+
+    function getReportContent(detail) {
+      const report = detail && detail.report ? detail.report : {};
+      return report.content || report.reportContent || '';
+    }
+
+    function hasReportContent(detail) {
+      return Boolean(String(getReportContent(detail)).trim());
+    }
+
+    function buildReportPreviewHtml(content) {
+      const value = String(content || '').trim();
+      if (!value) {
+        return '<!doctype html><html lang="zh-CN"><body style="font-family: Microsoft YaHei, Arial, sans-serif; padding: 32px; color: #63748a;">暂无报告内容</body></html>';
+      }
+      if (/<!doctype|<html[\s>]/i.test(value)) {
+        return value;
+      }
+      return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>body{margin:0;padding:32px;font-family:"Microsoft YaHei",Arial,sans-serif;color:#152235;background:#fff;line-height:1.75;}img,table{max-width:100%;}table{border-collapse:collapse;}td,th{border:1px solid #dbe5ee;padding:8px 10px;}h1,h2,h3{color:#0d2d43;}</style></head><body>${value}</body></html>`;
+    }
+
+    function previewReport() {
+      if (!hasReportContent(currentDetail)) {
+        showToast('暂无可预览的核查报告', 'error');
+        return;
+      }
+      el.reportPreviewFrame.srcdoc = buildReportPreviewHtml(getReportContent(currentDetail));
+      el.reportPreviewModal.classList.add('show');
+      el.reportPreviewModal.setAttribute('aria-hidden', 'false');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeReportPreview() {
+      el.reportPreviewModal.classList.remove('show');
+      el.reportPreviewModal.setAttribute('aria-hidden', 'true');
+      el.reportPreviewFrame.srcdoc = '';
+      document.body.style.overflow = '';
+    }
     function exportDetail() {
       if (!currentDetail) {
         showToast('暂无可导出的核查详情', 'error');
@@ -2610,19 +2843,21 @@
         return;
       }
 
-      const payload = { inputText };
+      const submitter = event.submitter;
+      const checkMode = submitter && submitter.dataset.checkMode === 'deep' ? 'deep' : 'quick';
+      const endpoint = checkMode === 'deep' ? '/api/fact-check/analyze/deep' : '/api/fact-check/analyze/quick';
+      const payload = { inputText, checkMode };
       if (el.hotEventId.value) {
         payload.hotEventId = Number(el.hotEventId.value);
       }
 
       clearResultForLoading();
-      el.analyzeBtn.disabled = true;
-      el.analyzeBtn.textContent = '核查中...';
+      setAnalyzeButtonsLoading(true, checkMode);
       el.metricStatus.textContent = '核查中';
       el.taskMeta.textContent = '正在核查';
 
       try {
-        const detail = await requestJson('/api/fact-check/analyze', {
+        const detail = await requestJson(endpoint, {
           method: 'POST',
           body: JSON.stringify(payload)
         });
@@ -2633,15 +2868,22 @@
         el.taskMeta.textContent = '核查失败';
         showToast(error.message, 'error');
       } finally {
-        el.analyzeBtn.disabled = false;
-        el.analyzeBtn.textContent = '开始核查';
+        setAnalyzeButtonsLoading(false, checkMode);
       }
+    }
+
+    function setAnalyzeButtonsLoading(loading, mode) {
+      el.quickAnalyzeBtn.disabled = loading;
+      el.deepAnalyzeBtn.disabled = loading;
+      el.quickAnalyzeBtn.textContent = loading && mode === 'quick' ? '快速核查中...' : '快速核查';
+      el.deepAnalyzeBtn.textContent = loading && mode === 'deep' ? '深度核查中...' : '深度核查';
     }
 
     function clearResultForLoading() {
       currentDetail = null;
       el.inputPanel.classList.remove('has-result');
       el.exportBtn.disabled = true;
+      el.previewReportBtn.disabled = true;
       el.metricTask.textContent = '-';
       el.metricStatus.textContent = '核查中';
       el.metricClaims.textContent = '0';
@@ -2660,6 +2902,7 @@
       currentDetail = detail;
       el.inputPanel.classList.add('has-result');
       el.exportBtn.disabled = false;
+      el.previewReportBtn.disabled = !hasReportContent(detail);
       const result = detail.result || {};
       const claims = detail.claims || [];
       const evidences = detail.evidences || [];
@@ -2720,6 +2963,7 @@
       el.inputPanel.classList.remove('show-advanced', 'has-result');
       el.advancedToggle.textContent = '高级选项';
       el.exportBtn.disabled = true;
+      el.previewReportBtn.disabled = true;
       el.metricTask.textContent = '-';
       el.metricStatus.textContent = '待提交';
       el.metricClaims.textContent = '0';
@@ -2740,6 +2984,14 @@
     el.resetBtn.addEventListener('click', resetPage);
     el.advancedToggle.addEventListener('click', toggleAdvancedOptions);
     el.exportBtn.addEventListener('click', exportDetail);
+    el.previewReportBtn.addEventListener('click', previewReport);
+    el.closeReportPreviewBtn.addEventListener('click', closeReportPreview);
+    el.reportPreviewModal.addEventListener('click', event => {
+      if (event.target === el.reportPreviewModal) closeReportPreview();
+    });
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && el.reportPreviewModal.classList.contains('show')) closeReportPreview();
+    });
     el.logoutBtn.addEventListener('click', logout);
 
     if (checkAuth()) {

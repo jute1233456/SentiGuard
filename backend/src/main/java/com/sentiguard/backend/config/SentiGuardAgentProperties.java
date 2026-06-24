@@ -12,6 +12,9 @@ public class SentiGuardAgentProperties {
 
     private String factCheckPath = "/internal/v1/fact-check";
 
+    private String quickFactCheckPath = "/internal/v1/fact-check/quick";
+
+    private String deepFactCheckPath = "/internal/v1/fact-check/deep";
     private String internalToken = "dev-internal-token";
 
     private int connectTimeoutMs = 10000;
