@@ -40,6 +40,7 @@ class ResultItem:
     analysisDetail: str = ""
     supportCount: int = 0
     attackCount: int = 0
+    neutralCount: int = 0
 
 
 @dataclass
@@ -67,6 +68,7 @@ class ReportData:
                 analysisDetail=f3_data.result.analysisDetail if f3_data and f3_data.result else "",
                 supportCount=f3_data.result.supportCount if f3_data and f3_data.result else 0,
                 attackCount=f3_data.result.attackCount if f3_data and f3_data.result else 0,
+                neutralCount=f3_data.result.neutralCount if f3_data and f3_data.result else 0,
             ) if f3_data and f3_data.result else None,
             run_id=run_id,
             generated_at=generated_at,

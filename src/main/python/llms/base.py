@@ -31,6 +31,7 @@ class BaseLLM(ABC):
         self.api_key = api_key
         self.base_url = base_url
         self.temperature = temperature
+        self.max_tokens = kwargs.pop("max_tokens", 16384)  # 默认 16K，解决 structured output 截断问题
         self.extra_kwargs = kwargs
         self._client = self._build_client()
 

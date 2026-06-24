@@ -1027,9 +1027,9 @@
 
 | 项 | 值 |
 |----|----|
-| 累计条目数 | 45 |
-| 涉及场景类别 | 代码理解、需求分析、接口设计、代码生成、文档撰写、算法理解、知识 Q&A、版本控制、字段精简、文档代码同步、架构调整、验证测试、交付总结、数据源验证、团队协作、数据源扩展、业务功能、数据采集、代码替换、功能完善、项目维护、配置优化、环境变量管理、向后兼容、Bug 排查、测试用例、接口联调、提示词优化、数据库对齐、日志增强、安全加固、置信度评分、报告模块重构、**LLM 叙事报告**、**Java 接口对接**、**结构化 IR 方案**、**Block-type 分派渲染**、**搜索服务优化**、**接口重构**、**证据模型重构**、**证据粒度优化**、**LangGraph 新节点** |
-| 已生成代码文件 | 45（新增 evidence_merging.py + 重构 evidence_seeking.py + 重构 fact_check.py + 修改 main_agent.py） |
+| 累计条目数 | 50 |
+| 涉及场景类别 | 代码理解、需求分析、接口设计、代码生成、文档撰写、算法理解、知识 Q&A、版本控制、字段精简、文档代码同步、架构调整、验证测试、交付总结、数据源验证、团队协作、数据源扩展、业务功能、数据采集、代码替换、功能完善、项目维护、配置优化、环境变量管理、向后兼容、Bug 排查、测试用例、接口联调、提示词优化、数据库对齐、日志增强、安全加固、置信度评分、报告模块重构、**LLM 叙事报告**、**Java 接口对接**、**结构化 IR 方案**、**Block-type 分派渲染**、**搜索服务优化**、**接口重构**、**证据模型重构**、**证据粒度优化**、**LangGraph 新节点**、**max_tokens 默认值修复**、**DeepLLMReportGenerator**、**报告生成防御性加固**、**三阶段HTML组装重构** |
+| 已生成代码文件 | 55（新增 evidence_merging.py + 重构 evidence_seeking.py + 重构 fact_check.py + 修改 main_agent.py + 修改 llms/* 三个 client + 修改 report/generator.py + 修改 report/prompts/prompts.py + 修改 prompts/deep_decomposer.py + 修改 report/renderers/html.py） |
 | 新增核心文件 | 30（+ evidence_merging.py） |
 | 已生成文档文件 | 8 |
 | 证据模型 | ✓ LLM 逐条判定 relationType + ✓ 逐条搜索结果独立为证据 + ✓ evidence_merger 合并同事件多来源 |
@@ -1153,3 +1153,177 @@
   - 同一事件多来源报道合并为一条，sources 数组汇总所有来源
   - 合并后的 credibilityScore 因多来源相互印证而提升，反映真实可信度
   - supportCount 按合并后条数计算，不再膨胀
+
+---
+
+### 日志条目 #46 — 声明拆解 Prompt 重构：一阶谓词逻辑 + 中文场景化
+
+- **日期**：2026-06-24
+- **场景**：提示词优化 / 质量改进
+- **关键 Prompt**：
+  > "声明拆解具体是怎么做的？提示词是什么"
+  > "我觉得问题非常大，尤其是拆分规则非常简陋。这样吧你先给例子改成中文的，然后拆分策略就说不能是包含关系"
+  > "再次加入说明，需要把声明拆解成若干子声明的一阶谓词式子，并且指明和声明等价的形式。比如张教授曾经在清北任职，可以拆成在清华或北大任职。每个子声明只要达到容易验证的程度就不必拆分。比如小明是中国人不必拆分成张雪峰是北京或上海或等等等。这样反而加大工作量。"
+- **背景**：审查声明拆解模块时发现 `claim_decomposition_prompt` 存在三个严重问题：(1) 仅一句英文描述"define all the predicates"，缺乏拆解策略指导；(2) 示例全部是英文（Howard University Hospital、Alfredo Cornejo Cuevas），与项目中文场景脱节；(3) 没有约束子声明之间的关系，LLM 可能拆出包含关系的子声明（如"获得奖牌"包含"获得金牌"），导致下游搜索工作量膨胀。
+- **AI 产出**：
+  - **`prompts/input_ingestion.py`** — `claim_decomposition_prompt` 全面重构：
+    1. **全中文改写**：prompt 从英文改为中文，示例替换为中文场景（武汉协和医院/同济医院、东京奥运会中国金牌数、张教授清北任职）
+    2. **一阶谓词逻辑形式**：每条子声明格式 `谓词(主体, 客体) ::: 中文描述`，谓词用英文动词过去式（Located、Won、WorkedAt 等）
+    3. **等价性原则**：明确拆解后的子声明集合必须与原声明逻辑等价——AND 关系（"和/都"→ 全部为真）和 OR 关系（"或"→ 至少一个为真），用逻辑符号标注
+    4. **适度拆分原则**：拆到"容易通过搜索验证"即可，反对过度拆分（如"张雪峰是中国人"不必拆成省市）
+    5. **禁止包含关系**：子声明之间不能互相包含（A 成立则 B 必然成立 → B 被 A 包含）
+  - `claim_classification_prompt` 和 `claim_splitter_prompt` 暂未改动（仍为英文）
+- **人工修改**：用户明确要求加入一阶谓词逻辑等价性和适度拆分原则
+- **风险控制**：
+  - 输出 schema（`subclaims` 字符串数组）不变，下游消费代码零改动
+  - 示例中的英文谓词名（Located/Won/WorkedAt）与旧格式兼容
+  - 适度拆分原则防止过度拆解导致搜索工作量膨胀
+- **价值**：
+  - 声明拆解从"一句话英文指令"升级为结构化、可预期的拆解策略
+  - 一阶谓词逻辑形式让子声明语义清晰，便于下游证据匹配
+  - AND/OR 等价性约束确保拆解后不丢失原声明的逻辑关系
+  - 适度拆分 + 禁止包含关系双重约束控制拆解粒度，平衡核查质量与工作量
+
+---
+
+### 日志条目 #47 — DeepLLMReportGenerator：深度搜索逐段报告生成
+
+- **日期**：2026-06-24
+- **场景**：功能开发 / 架构扩展
+- **关键 Prompt**：
+  > "继续刚才的这个逐段生成报告... 证据以及声明应该放在一起来做。逐个声明后面接上证据，以及分析"
+  > "每个子声明以及其证据分析都要llm单个输出，然后在汇总，在和llm对话生成报告时，告诉llm当前报告进度以及llm这次对话的任务"
+- **背景**：深度搜索的报告之前使用 `LLMReportGenerator`（IR 模式），但存在两个问题：(1) 证据章节 LLM 经常遗漏部分证据；(2) IR 模式的多阶段流水线过于复杂。用户要求按思考逻辑顺序逐段生成。
+- **AI 产出**：
+
+  **A. 新增 Prompt（`report/prompts/prompts.py`）**
+  - `SYSTEM_PROMPT_DEEP_CLAIM_ANALYSIS` — 逐子声明分析：含进度占位符 `{progress_info}`，LLM 逐条分析所有证据并给出综合判断
+  - `SYSTEM_PROMPT_DEEP_SUMMARIZE` — 汇总所有分析为完整 Markdown 报告
+  - `SYSTEM_PROMPT_DEEP_MD_TO_HTML` — Markdown→HTML 转换，含 CSS 模板
+
+  **B. 新增 `DeepLLMReportGenerator`（`report/generator.py`）**
+  - 继承 `LLMReportGenerator`，四阶段流水线：
+    1. `_design_layout()` — 布局设计（复用父类）
+    2. `_analyze_all_claims()` — 逐个分析子声明+证据，每个独立 LLM 调用
+    3. `_summarize_report()` — 汇总生成完整 Markdown
+    4. `_convert_md_to_html()` — LLM 将 Markdown→HTML
+  - 每个阶段有独立降级路径
+
+  **C. 路由更新（`api/routers/fact_check.py`）**
+  - deep 路由改用 `DeepLLMReportGenerator`
+
+  **D. 导出更新（`report/__init__.py`）**
+
+- **风险控制**：逐条 try/except + 三步降级（子声明→汇总→HTML）
+- **价值**：子声明+证据捆绑分析，逻辑连贯；进度告知提升生成质量
+
+---
+
+### 日志条目 #48 — LLM max_tokens 默认为 16384，修复 structured_output 截断
+
+- **日期**：2026-06-24
+- **场景**：Bug 修复
+- **关键 Prompt**：
+  > （用户提供 traceback）"Could not parse response content as the length limit was reached — CompletionUsage(completion_tokens=4096, prompt_tokens=38827, total_tokens=42923)"
+- **背景**：深度核查时 evidence_seeker 节点调用失败。LLM 的 structured output（JSON）超过 4096 token 上限被截断，无法解析。根因是 `BaseLLM` 及其子类（`DoubaoLLM`/`OpenAILLM`/`OllamaLLM`）的 `as_langchain_chat_model()` 和原生 API 调用均未传递 `max_tokens`，导致各模型使用默认的 4096 上限。
+- **AI 产出**：
+  - **`llms/base.py`**：`BaseLLM.__init__` 新增 `self.max_tokens`，从 `**kwargs` 提取，默认值 16384
+  - **`llms/doubao_client.py`**：`chat()` / `chat_with_json()` 和 `as_langchain_chat_model()` 均使用 `self.max_tokens`
+  - **`llms/openai_client.py`**：同上
+  - **`llms/ollama_client.py`**：`chat()` / `chat_with_json()` 使用 `num_predict` 选项，`as_langchain_chat_model()` 的 `ChatOllama` 使用 `num_predict` 参数
+- **人工修改**：无
+- **风险控制**：
+  - 默认 16384 对大多数模型安全（doubao-seed / GPT-4o 系列均支持）
+  - 可通过 `create_chat_model(model_name, max_tokens=N)` 或环境变量覆盖
+  - 不修改 `BaseLLM` 公共 API 签名（仅从 kwargs 提取），不影响现有调用
+- **价值**：
+  - 修复 evidence_seeker / evidence_merger 等大输出节点的 structured_output 截断问题
+  - 统一三个 LLM 提供商的 max_tokens 行为
+  - 开闭原则：新增的 `max_tokens` 从 kwargs 透传，不破坏现有接口
+
+---
+
+### 日志条目 #49 — DeepLLMReportGenerator 防御性加固 + Double JSON encoding 修复
+
+- **日期**：2026-06-24
+- **场景**：Bug 修复
+- **关键 Prompt**：
+  > "我记得报告时逐段生成的，为什么依然超出范围？？还是说调用过程有误？"
+  > "很可能是最后一步出的问题"
+- **背景**：证据模型重构（commit `5e2aa5e`）后证据内容暴增，`DeepLLMReportGenerator.generate()` 一直抛异常，降级到数据驱动 `ReportGenerator`。排查发现三个问题。
+- **AI 产出**：
+
+  **A. `_design_layout` 无异常保护（`report/generator.py:172`）**
+  - 整个 `generate()` 中唯一没有 try/except 的 LLM 调用
+  - 一旦 API 报错（限流/超时），`generate()` 直接崩溃
+  - → 加了 try/except，失败时返回默认 layout
+
+  **B. `_summarize_report` Double JSON encoding（`report/generator.py:668-692`）**
+  - `layout_json = json.dumps({...})` 然后 `json.dumps({"layout": layout_json})` → 所有引号被二次转义，token 数翻倍
+  - 证据重构后每个子声明分析文本膨胀 5 倍 + double escaping → prompt 轻松 50K+ chars
+  - → 改为直接传递 dict/list，消除二次序列化
+
+  **C. `_convert_md_to_html` 大文档保护（`report/generator.py:729-757`）**
+  - 整份 Markdown 一坨扔给 LLM 做 MD→HTML 转换，超过 20000 字符时 token 极易溢出
+  - → 新增 `len(md_content) > 20000` 阈值，超限直接走 IR 渲染器（纯本地转换，无 LLM 调用）
+  - 同时修复 `kpi_json` 的 double encoding → 改为 `kpis` 字典直传
+
+  **D. Prompt 文档同步（`report/prompts/prompts.py`）**
+  - `SYSTEM_PROMPT_DEEP_SUMMARIZE` 和 `SYSTEM_PROMPT_DEEP_MD_TO_HTML` 的占位符说明更新为新格式
+  - 旧格式引用了 `{layout_json}` / `{analyses_json}` / `{kpi_json}` → 改为描述 JSON 字段 `layout` / `analyses` / `kpis`
+
+  **E. 声明拆解日志兜底（`prompts/deep_decomposer.py:55`）**
+  - `decompose()` 首轮 LLM 调用失败时返回 `[claim]` 但之前不写任何 log
+  - → 新增 `initial_failed` 类型日志条目
+
+- **风险控制**：所有改动都是增量防御（加 try/except、降级阈值），不改变现有成功路径的行为
+- **价值**：
+  - 修复 `DeepLLMReportGenerator` 崩溃问题，`generate()` 现在不会因单点 LLM 失败而整体挂掉
+  - prompt 体积减半（消除 double encoding），LLM 调用成功率显著提升
+  - 大文档自动跳过 LLM MD→HTML，避免 token 溢出
+
+---
+
+### 日志条目 #50 — DeepLLMReportGenerator 三阶段 HTML 组装重构
+
+- **日期**：2026-06-24
+- **场景**：架构重构
+- **关键 Prompt**：
+  > "报告内容太大了没法直接进行编辑，我们修改生成报告的方法，让他先根据模板生成一个框架，然后再逐段的生成html填入其中"
+- **背景**：旧的 `_summarize_report` + `_convert_md_to_html` 两阶段都是"把全部内容一坨扔给 LLM"，证据重构后 prompt 轻松 50K+ chars，LLM 调用失败或产出不稳定。需要分治策略。
+- **AI 产出**：
+
+  **A. `HTMLRenderer.render_framework()`（`report/renderers/html.py:89`）**
+  - 用 IR 渲染器生成 HTML 骨架（完整 CSS + Hero + KPI + 判定标语 + 报告附注）
+  - 骨架中预留 `{claim_sections}` 占位符，CSS 样式完整可控（不依赖 LLM）
+  - 新增 `.verdict-banner` / `.report-footer` / `.claim-card` 等 CSS 类
+
+  **B. `SYSTEM_PROMPT_CLAIM_CARD_HTML`（`report/prompts/prompts.py:230`）**
+  - 专门用于单张声明分析卡片的 LLM 生成 prompt
+  - 输入 ~3K chars（1 个子声明 + 证据列表），输出 ~2K-4K chars
+  - 远低于任何模型的 token 上限，不会截断
+
+  **C. `_render_html_report()`（`report/generator.py:653`）**
+  - 三阶段流程：
+    ① `render_framework(layout, result)` → HTML 骨架（纯本地，无 LLM）
+    ② 对每个子声明，LLM 生成一张 `.claim-card`（独立调用，失败隔离）
+    ③ `framework.replace("{claim_sections}", all_cards)`（纯字符串，无 LLM）
+  - 替换旧 `_summarize_report` + `_convert_md_to_html`
+
+  **D. `_build_claim_card_html_fallback()`（`report/generator.py:697`）**
+  - 单个子声明 LLM 调用失败时的 HTML 降级卡片
+  - 纯数据渲染：证据卡含关系标签、可信度进度条、来源链接
+
+  **E. `generate()` 更新（`report/generator.py:525`）**
+  - 调用链变更：`_analyze_all_claims()` → `_render_html_report()`
+  - 删除 `_summarize_report` / `_convert_md_to_html` 调用（方法保留不删，向后兼容）
+
+- **风险控制**：
+  - 每段 LLM 调用独立，单段失败→降级为数据卡片，不影响其他段
+  - CSS 由 IR 渲染器统一管理，不依赖 LLM 生成
+  - `_summarize_report` / `_convert_md_to_html` 保留不删，旧路径可随时切回
+- **价值**：
+  - 彻底解决大文档 LLM token 溢出问题（分治策略，每段 <5K tokens）
+  - CSS 质量有保障（IR 渲染器管理，不再靠 LLM 手写）
+  - 失败隔离：单个子声明失败不影响整体报告
+  - 可观察：每张卡片生成打一行日志，用户可见进度

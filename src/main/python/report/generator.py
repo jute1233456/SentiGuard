@@ -35,7 +35,12 @@ from .models import ReportData, ReportResult, SectionOutput
 from .prompts.prompts import (
     SYSTEM_PROMPT_CHAPTER_IR,
     SYSTEM_PROMPT_REPORT_LAYOUT,
+    SYSTEM_PROMPT_DEEP_CLAIM_ANALYSIS,
+    SYSTEM_PROMPT_DEEP_SUMMARIZE,
+    SYSTEM_PROMPT_DEEP_MD_TO_HTML,
+    SYSTEM_PROMPT_CLAIM_CARD_HTML,
 )
+from ..prompts.deep_decomposer import DeepClaimDecomposer, DEFAULT_DEEP_REFLECTION_COUNT
 from .sections.base import get_section
 from .templates.base import get_template
 from .renderers.base import get_renderer
@@ -165,14 +170,17 @@ class LLMReportGenerator:
             "kpis": kpis,
         }, ensure_ascii=False, indent=2)
 
-        response = self.llm.generate(SYSTEM_PROMPT_REPORT_LAYOUT, user_prompt)
-        layout = robust_json_loads(response, "布局设计")
-        if layout:
-            # 确保关键字段存在
-            layout.setdefault("keyFindings", [])
-            layout.setdefault("kpis", kpis)
-            layout.setdefault("chapterGuidance", {})
-            return layout
+        try:
+            response = self.llm.generate(SYSTEM_PROMPT_REPORT_LAYOUT, user_prompt)
+            layout = robust_json_loads(response, "布局设计")
+            if layout:
+                # 确保关键字段存在
+                layout.setdefault("keyFindings", [])
+                layout.setdefault("kpis", kpis)
+                layout.setdefault("chapterGuidance", {})
+                return layout
+        except Exception as e:
+            logger.warning("布局设计 LLM 调用失败，使用默认布局: %s", e)
         return {
             "title": f"事实核查报告",
             "summary": "",
@@ -467,14 +475,422 @@ class LLMReportGenerator:
                     "value": f"{result.confidenceScore}/100",
                     "tone": tone,
                 })
+            total = result.supportCount + result.attackCount + result.neutralCount
             kpis.append({
                 "label": "证据总量",
-                "value": f"{result.supportCount + result.attackCount} 条",
+                "value": f"{total} 条",
                 "tone": "neutral",
             })
             kpis.append({
-                "label": "支持 / 反驳",
-                "value": f"{result.supportCount} / {result.attackCount}",
+                "label": "支持 / 反驳 / 中性",
+                "value": f"{result.supportCount} / {result.attackCount} / {result.neutralCount}",
                 "tone": "good" if result.supportCount >= result.attackCount else "bad",
             })
         return kpis
+
+
+class DeepLLMReportGenerator(LLMReportGenerator):
+    """深度搜索专用报告生成器。
+
+    逐段生成，每个子声明+其证据捆绑分析：
+    1. LLM 设计布局
+    2. 对每个子声明，LLM 分析子声明+其所有证据（逐条分析）
+    3. LLM 汇总所有分析生成完整 Markdown
+    4. LLM 将 Markdown → 美观 HTML
+    """
+
+    def __init__(self, data: ReportData, reflection_count: int = DEFAULT_DEEP_REFLECTION_COUNT):
+        super().__init__(data)
+        self.conversation_log: List[Dict[str, Any]] = []
+        self.reflection_count = reflection_count
+        self.decomposition_log: List[Dict[str, Any]] = []
+
+    def _llm_call(self, phase: str, system_prompt: str, user_prompt: str) -> str:
+        """调用 LLM 并记录对话日志"""
+        response = self.llm.generate(system_prompt, user_prompt)
+        self.conversation_log.append({
+            "phase": phase,
+            "system_prompt": system_prompt,
+            "user_prompt": user_prompt,
+            "response": response,
+        })
+        return response
+
+    def get_conversation_log(self) -> List[Dict[str, Any]]:
+        return list(self.conversation_log)
+
+    def get_decomposition_log(self) -> List[Dict[str, Any]]:
+        return list(self.decomposition_log)
+
+    def generate(self, renderer_name: str = "html") -> ReportResult:
+        """生成深度搜索报告（三阶段流程）：
+        ① IR 渲染器生成 HTML 骨架（Hero + KPI + CSS），留 {claim_sections} 占位符
+        ② LLM 逐段生成每个子声明的 HTML 卡片
+        ③ 纯字符串 replace 组装
+        """
+        self.conversation_log = []
+        self.decomposition_log = []
+
+        try:
+            # 阶段1: 布局设计
+            layout = self._design_layout()
+
+            # 阶段1.5: 深度声明拆解（带反思机制）
+            self._deep_decompose_claims()
+
+            # 阶段2+3: 三阶段 HTML 组装（逐段 LLM 生成卡片，不再需要单独的 MD 分析步骤）
+            html_content = self._render_html_report(layout)
+
+            return ReportResult(
+                title=layout.get("title", "深度事实核查报告"),
+                sections=[SectionOutput(title=layout.get("title", "深度事实核查报告"), content=html_content, order=1)],
+                content=html_content,
+                format="html",
+            )
+        except Exception as e:
+            logger.exception("DeepLLMReportGenerator.generate() 异常，降级到数据驱动模式: %s", e)
+            raise
+
+    def _deep_decompose_claims(self):
+        """使用 DeepClaimDecomposer 对原始声明进行深度拆解（带反思），
+        替换 data.claims 中的子声明列表。"""
+        original_claim = self.data.claim
+        if not original_claim:
+            logger.warning("原始声明为空，跳过深度拆解")
+            return
+
+        try:
+            decomposer = DeepClaimDecomposer(
+                reflection_count=self.reflection_count,
+            )
+            deep_subclaims = decomposer.decompose(original_claim)
+
+            self.decomposition_log = decomposer.reflection_log
+
+            if not deep_subclaims or deep_subclaims == [original_claim]:
+                logger.info("深度拆解未产生新子声明，使用原有 claims")
+                return
+
+            from .models import ClaimItem
+            new_claims = []
+            for i, sc_text in enumerate(deep_subclaims, 1):
+                new_claims.append(ClaimItem(
+                    claimOrder=i,
+                    claimText=sc_text,
+                    claimType="verifiable",
+                ))
+
+            logger.info("深度拆解: %d 条子声明（原 %d 条）", len(new_claims), len(self.data.claims))
+            self.data.claims = new_claims
+        except Exception as e:
+            logger.exception("深度声明拆解异常，跳过拆解使用原有 claims: %s", e)
+            self.decomposition_log = [{
+                "round": 0,
+                "type": "decompose_failed",
+                "subclaims": [original_claim],
+                "summary": f"DeepClaimDecomposer 异常: {e}",
+            }]
+
+    def _build_claim_evidence_map(self) -> List[Dict[str, Any]]:
+        """按 claimOrder 将证据分组到对应的子声明"""
+        data = self.data
+        claim_map = {}
+        for c in data.claims:
+            claim_map[c.claimOrder] = {
+                "order": c.claimOrder,
+                "text": c.claimText,
+                "type": c.claimType,
+                "evidences": [],
+            }
+
+        for e in data.evidences:
+            order = e.claimOrder
+            if order not in claim_map:
+                claim_map[order] = {
+                    "order": order,
+                    "text": f"子声明 #{order}",
+                    "type": "verifiable",
+                    "evidences": [],
+                }
+            claim_map[order]["evidences"].append({
+                "title": e.evidenceTitle or "",
+                "content": (e.evidenceContent or "")[:2000],
+                "source": e.sourceName or "",
+                "url": e.evidenceUrl or "",
+                "relation": e.relationType or "neutral",
+                "credibility": e.credibilityScore,
+            })
+
+        return [claim_map[k] for k in sorted(claim_map.keys())]
+
+    def _analyze_all_claims(self) -> List[str]:
+        """逐个分析每个子声明+其证据"""
+        claim_evidences = self._build_claim_evidence_map()
+        total = len(claim_evidences)
+        analyses = []
+
+        for i, item in enumerate(claim_evidences, 1):
+            progress_info = f"正在分析第 {i}/{total} 个子声明"
+
+            data_packet = {
+                "claimOrder": item["order"],
+                "claimText": item["text"],
+                "claimType": item["type"],
+                "evidences": item["evidences"],
+                "evidenceCount": len(item["evidences"]),
+            }
+
+            user_prompt = json.dumps({
+                "progress": progress_info,
+                "claimData": data_packet,
+            }, ensure_ascii=False, indent=2)
+
+            try:
+                response = self._llm_call(
+                    f"analyze_claim_{i}",
+                    SYSTEM_PROMPT_DEEP_CLAIM_ANALYSIS,
+                    user_prompt,
+                )
+                analyses.append(response)
+                logger.info("子声明 %d/%d 分析完成", i, total)
+            except Exception as e:
+                logger.warning("子声明 %d 分析失败: %s", i, e)
+                fallback = self._build_claim_fallback(item)
+                analyses.append(fallback)
+
+        return analyses
+
+    def _render_html_report(self, layout: Dict[str, Any]) -> str:
+        """三阶段 HTML 组装：
+        ① 渲染 HTML 骨架（Hero + KPI + CSS），留 {claim_sections} 占位符
+        ② LLM 逐段生成每个子声明的 HTML 卡片（分析+证据内嵌）
+        ③ 组装
+        """
+        try:
+            return self._do_render_html_report(layout)
+        except Exception as e:
+            logger.exception("三阶段 HTML 组装失败，降级到 IR 渲染器: %s", e)
+            from .renderers.html import HTMLRenderer
+            renderer = HTMLRenderer()
+            return renderer.render_llm("（报告生成失败，请重试）", layout)
+
+    def _do_render_html_report(self, layout: Dict[str, Any]) -> str:
+        """三阶段 HTML 组装的具体实现"""
+        from .renderers.html import HTMLRenderer
+        renderer = HTMLRenderer()
+
+        # 阶段①：HTML 骨架（含声明拆解列表）
+        result = self.data.result
+        claim_texts = [c.claimText for c in self.data.claims] if self.data.claims else []
+        framework = renderer.render_framework(
+            layout, result=result, claim_texts=claim_texts,
+        )
+
+        # 阶段②：逐段 LLM 生成 HTML 卡片
+        claim_evidences = self._build_claim_evidence_map()
+        total = len(claim_evidences)
+        cards: List[str] = []
+
+        for i, item in enumerate(claim_evidences, 1):
+            progress_info = f"正在生成第 {i}/{total} 个声明分析卡片"
+
+            data_packet = {
+                "progress": progress_info,
+                "claimOrder": item["order"],
+                "claimText": item["text"],
+                "claimType": item["type"],
+                "evidences": item["evidences"],
+                "evidenceCount": len(item["evidences"]),
+            }
+
+            user_prompt = json.dumps(data_packet, ensure_ascii=False, indent=2)
+
+            try:
+                response = self._llm_call(
+                    f"claim_card_{i}",
+                    SYSTEM_PROMPT_CLAIM_CARD_HTML,
+                    user_prompt,
+                )
+                import re as _re
+                match = _re.search(r"```(?:html)?\s*([\s\S]*?)\s*```", response)
+                if match:
+                    cards.append(match.group(1).strip())
+                else:
+                    cards.append(response.strip())
+                logger.info("声明卡片 %d/%d 生成完成", i, total)
+            except Exception as e:
+                logger.warning("声明卡片 %d 生成失败: %s", i, e)
+                fallback = self._build_claim_card_html_fallback(item)
+                cards.append(fallback)
+
+        # 阶段③：组装
+        all_cards = "\n".join(cards)
+        return framework.replace("{claim_sections}", all_cards)
+
+    def _build_claim_card_html_fallback(self, item: Dict[str, Any]) -> str:
+        """逐段 LLM 调用失败时的 HTML 降级卡片（纯数据渲染，不调 LLM）"""
+        order = item.get("order", "?")
+        text = item.get("text", "")
+        ctype = item.get("type", "verifiable")
+        parts = [
+            f'<div class="claim-card">',
+            f'<div class="claim-card-header">',
+            f'<span class="claim-number">子声明 {order}</span>',
+            f'<span class="claim-type-badge">{ctype}</span>',
+            f"</div>",
+            f'<blockquote class="claim-text">{text}</blockquote>',
+            f'<div class="claim-analysis"><h4>证据列表</h4></div>',
+            f'<div class="evidence-list">',
+        ]
+        for ev in item.get("evidences", []):
+            rel = ev.get("relation", "neutral")
+            rel_label = {"support": "支持", "attack": "反驳", "neutral": "中性"}.get(rel, "中性")
+            cred = ev.get("credibility")
+            cred_html = ""
+            if cred is not None:
+                cred_int = max(0, min(100, int(cred)))
+                cred_class = "high" if cred_int >= 60 else ("mid" if cred_int >= 30 else "low")
+                cred_html = (
+                    f'<div class="evidence-credibility">'
+                    f'<span class="cred-label">可信度</span>'
+                    f'<div class="cred-bar"><div class="cred-fill {cred_class}" style="width:{cred_int}%"></div></div>'
+                    f'<span class="cred-value">{cred_int}/100</span>'
+                    f"</div>"
+                )
+            parts.append(
+                f'<div class="evidence-card">'
+                f'<div class="evidence-header">'
+                f'<span class="evidence-relation {rel}">{rel_label}</span>'
+                f'<span class="evidence-claim">{ev.get("source", "")}</span>'
+                f"</div>"
+                f'<div class="evidence-body">'
+                f'<div class="evidence-title">{ev.get("title", "")}</div>'
+                f'<div class="evidence-content">{ev.get("content", "")}</div>'
+                f"{cred_html}"
+                f"</div>"
+                f'<div class="evidence-footer">'
+                f'<a class="evidence-source" href="{ev.get("url", "")}" target="_blank">查看原文 →</a>'
+                f"</div>"
+                f"</div>"
+            )
+        parts.append("</div>")  # evidence-list
+        parts.append("</div>")  # claim-card
+        return "\n".join(parts)
+
+    def _build_claim_fallback(self, item: Dict[str, Any]) -> str:
+        """子声明分析失败时的降级文本"""
+        lines = [
+            f"### 子声明 {item['order']}：{item['text']}",
+            "",
+            "**证据列表：**",
+        ]
+        for ev in item.get("evidences", []):
+            rel_icon = {"support": "✅", "attack": "❌", "neutral": "➖"}.get(ev["relation"], "📄")
+            lines.append(f"- {rel_icon} [{ev['relation']}] {ev['title']}（来源：{ev['source']}）")
+            if ev["content"]:
+                lines.append(f"  {ev['content'][:200]}")
+        lines.append("")
+        return "\n".join(lines)
+
+    def _summarize_report(self, layout: Dict[str, Any], analyses: List[str]) -> str:
+        """汇总所有子声明分析，生成完整 Markdown 报告"""
+        result = self.data.result
+        kpis = layout.get("kpis", [])
+
+        user_prompt = json.dumps({
+            "layout": {
+                "title": layout.get("title", "事实核查报告"),
+                "summary": layout.get("summary", ""),
+                "keyFindings": layout.get("keyFindings", []),
+                "kpis": kpis,
+                "result": {
+                    "label": result.resultLabel if result else "N/A",
+                    "confidenceScore": result.confidenceScore if result else None,
+                    "conclusion": result.conclusion if result else "",
+                    "analysisDetail": result.analysisDetail if result else "",
+                },
+                "evidenceStats": {
+                    "total": len(self.data.evidences),
+                    "support": sum(1 for e in self.data.evidences if e.relationType == "support"),
+                    "attack": sum(1 for e in self.data.evidences if e.relationType == "attack"),
+                    "neutral": sum(1 for e in self.data.evidences if e.relationType == "neutral"),
+                },
+            },
+            "analyses": analyses,
+        }, ensure_ascii=False, indent=2)
+
+        try:
+            response = self._llm_call("summarize", SYSTEM_PROMPT_DEEP_SUMMARIZE, user_prompt)
+            return response
+        except Exception as e:
+            logger.warning("汇总报告生成失败: %s", e)
+            return self._build_fallback_summary(layout, analyses)
+
+    def _build_fallback_summary(self, layout: Dict[str, Any], analyses: List[str]) -> str:
+        """汇总失败时的降级：直接拼接"""
+        parts = [
+            f"# {layout.get('title', '事实核查报告')}",
+            "",
+            layout.get("summary", ""),
+            "",
+            "## 声明拆解与证据分析",
+            "",
+        ]
+        parts.extend(analyses)
+        result = self.data.result
+        if result:
+            parts.extend([
+                "",
+                "## 综合判定",
+                f"**判定**：{result.resultLabel}",
+                f"**置信度**：{result.confidenceScore}/100" if result.confidenceScore else "",
+                f"**结论**：{result.conclusion}",
+                "",
+            ])
+        parts.extend([
+            "## 报告附注",
+            f"- 追踪 ID：`{self.data.run_id}`" if self.data.run_id else "",
+            f"- 生成时间：{self.data.generated_at}" if self.data.generated_at else "",
+        ])
+        return "\n".join(parts)
+
+    def _convert_md_to_html(self, md_content: str, layout: Dict[str, Any]) -> str:
+        """将 Markdown 转换为 HTML。
+        内容较短时用 LLM 美化，过长时直接走 IR 渲染器（避免 LLM token 溢出）。"""
+        result = self.data.result
+
+        kpi_data = self._build_kpis(result)
+
+        # 内容超过 20000 字符时，跳过 LLM 调用，直接用 IR 渲染器
+        # LLM MD→HTML 需要输入+输出双倍 token，大文档极易截断
+        if len(md_content) > 20000:
+            logger.info("Markdown 内容过长 (%d chars)，跳过 LLM，直接使用 IR 渲染器", len(md_content))
+            from .renderers.base import get_renderer
+            renderer_cls = get_renderer("html")
+            renderer = renderer_cls()
+            return renderer.render_llm(md_content, layout)
+
+        user_prompt = json.dumps({
+            "kpis": kpi_data,
+            "markdown_content": md_content,
+        }, ensure_ascii=False, indent=2)
+
+        try:
+            response = self._llm_call("md_to_html", SYSTEM_PROMPT_DEEP_MD_TO_HTML, user_prompt)
+            import re
+            match = re.search(r"```(?:html)?\s*([\s\S]*?)\s*```", response)
+            if match:
+                return match.group(1).strip()
+            if response.strip().startswith("<!DOCTYPE") or response.strip().startswith("<html"):
+                return response.strip()
+            # LLM 输出不规范，降级到 IR 渲染器
+            from .renderers.base import get_renderer
+            renderer_cls = get_renderer("html")
+            renderer = renderer_cls()
+            return renderer.render_llm(md_content, layout)
+        except Exception as e:
+            logger.warning("Markdown→HTML 转换失败: %s", e)
+            from .renderers.base import get_renderer
+            renderer_cls = get_renderer("html")
+            renderer = renderer_cls()
+            return renderer.render_llm(md_content, layout)

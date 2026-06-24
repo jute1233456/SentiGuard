@@ -39,7 +39,7 @@ from src.main.python.api.schemas import (
 )
 from src.main.python.main_agent import FactAgent
 from src.main.python.reflective_fact_agent import ReflectiveFactAgent
-from src.main.python.report import ReportGenerator, LLMReportGenerator
+from src.main.python.report import ReportGenerator, LLMReportGenerator, DeepLLMReportGenerator
 from src.main.python.report.models import ReportData as ReportModuleData
 
 router = APIRouter(
@@ -256,10 +256,11 @@ def _merge_evidence(trace_evidence: list, reflective_evidence: list) -> list:
 
 
 def _build_f3_result(label: str, explanation: str, confidence_score, evidence_items: list) -> F3Result:
-    """构建 F3Result（含 resultLabel、conclusion、supportCount、attackCount）。"""
+    """构建 F3Result（含 resultLabel、conclusion、supportCount、attackCount、neutralCount）。"""
     result_label, conclusion = _build_result_conclusion(label, evidence_items)
     support_count = sum(1 for ev in evidence_items if ev.relationType == "support")
     attack_count = sum(1 for ev in evidence_items if ev.relationType == "attack")
+    neutral_count = sum(1 for ev in evidence_items if ev.relationType == "neutral")
     return F3Result(
         resultLabel=result_label,
         confidenceScore=confidence_score,
@@ -267,6 +268,7 @@ def _build_f3_result(label: str, explanation: str, confidence_score, evidence_it
         analysisDetail=explanation or "经多智能体系统分析完成事实核查。",
         supportCount=support_count,
         attackCount=attack_count,
+        neutralCount=neutral_count,
     )
 
 
@@ -351,13 +353,13 @@ def _build_deep_response(reflective_agent: ReflectiveFactAgent, req: FactCheckRe
     all_evidence_items = _merge_evidence(trace_evidence, ref_result.get("all_evidences", []))
     f3_result = _build_f3_result(label, explanation, confidence_score, all_evidence_items)
 
-    # LLM HTML 报告（失败降级为 Markdown）
+    # LLM HTML 报告（深度搜索专用生成器，失败降级为 Markdown）
     report_data = _build_report_data_from_f3(claims, all_evidence_items, f3_result, reflective_agent.trace, req.claim.strip())
     try:
-        report_result = LLMReportGenerator(report_data).generate(renderer_name="html")
+        report_result = DeepLLMReportGenerator(report_data).generate(renderer_name="html")
         report_format = "html"
     except Exception:
-        logging.getLogger("fact_check").warning("LLM 报告生成失败，降级为数据驱动模式", exc_info=True)
+        logging.getLogger("fact_check").warning("深度报告生成失败，降级为数据驱动模式", exc_info=True)
         report_result = ReportGenerator(report_data).generate()
         report_format = "markdown"
 

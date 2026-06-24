@@ -86,6 +86,105 @@ class HTMLRenderer(BaseRenderer):
 
         return self._wrap_html(title, "\n".join(body_parts), kpis=kpis)
 
+    def render_framework(
+        self, layout: Dict[str, Any],
+        result: Any = None,
+        claims: Any = None,          # List[ClaimItem]
+        claim_texts: List[str] = None,  # 声明拆解后的文本列表
+    ) -> str:
+        """渲染 HTML 骨架（Hero + KPI + CSS），遵循标准报告模板结构：
+        ① 报告摘要（Hero + KPIs）
+        ② 判定结论（Verdict banner）
+        ③ 声明拆解（按 StandardTemplate claims section）
+        ④ 证据分析（{claim_sections} 占位符 → 逐段 LLM 卡片填充）
+        ⑤ 报告附注（Metadata）
+
+        用于 DeepLLMReportGenerator 的三阶段流程：框架 → 逐段 LLM 卡片 → 组装。
+        """
+        title = layout.get("title", "事实核查报告")
+        kpis = layout.get("kpis", [])
+        summary = layout.get("summary", "")
+        key_findings = layout.get("keyFindings", [])
+
+        body_parts: List[str] = []
+
+        # ================================================================
+        # Section ①：报告摘要（Hero + KPIs）
+        # ================================================================
+        hero_parts = [f'<div class="hero"><h1>{self._escape(title)}</h1>']
+        if summary:
+            hero_parts.append(f'<p class="summary">{self._escape(summary)}</p>')
+        if key_findings:
+            hero_parts.append('<div class="findings">')
+            for f in key_findings:
+                hero_parts.append(
+                    f'<div class="finding"><strong>{self._escape(f.get("label", ""))}</strong>'
+                    f'<p>{self._escape(f.get("detail", ""))}</p></div>'
+                )
+            hero_parts.append("</div>")
+        hero_parts.append("</div>")
+        body_parts.append("".join(hero_parts))
+
+        # KPI 卡片
+        if kpis:
+            body_parts.append(self._render_kpi_row(kpis))
+
+        # ================================================================
+        # Section ②：判定结论
+        # ================================================================
+        if result:
+            rlabel = getattr(result, "resultLabel", "") or ""
+            if rlabel:
+                verdict_class = "true" if "真" in rlabel else ("false" if "假" in rlabel else "uncertain")
+                confidence = getattr(result, "confidenceScore", None)
+                conclusion = getattr(result, "conclusion", "") or ""
+                body_parts.append(
+                    f'<div class="verdict-banner {verdict_class}">'
+                    f'<span class="verdict-icon">{ "✅" if verdict_class == "true" else ("❌" if verdict_class == "false" else "⚠️") }</span>'
+                    f'<div class="verdict-body">'
+                    f'<span class="verdict-text">判定结果：{self._escape(rlabel)}</span>'
+                )
+                if confidence is not None:
+                    body_parts.append(
+                        f'<span class="verdict-confidence">置信度：{confidence}/100</span>'
+                    )
+                if conclusion:
+                    body_parts.append(f'<p class="verdict-conclusion">{self._escape(conclusion)}</p>')
+                body_parts.append("</div></div>")
+
+        # ================================================================
+        # Section ③：声明拆解
+        # ================================================================
+        if claim_texts:
+            body_parts.append('<div class="section section-claims">')
+            body_parts.append('<h2 class="section-title">📋 声明拆解</h2>')
+            body_parts.append('<p class="section-desc">以下为原始声明经深度拆解后得到的可独立核查的子声明：</p>')
+            body_parts.append('<ol class="claim-list">')
+            for i, ct in enumerate(claim_texts, 1):
+                body_parts.append(f'<li><strong>子声明 {i}</strong>：{self._escape(ct)}</li>')
+            body_parts.append('</ol>')
+            body_parts.append('</div>')
+
+        # ================================================================
+        # Section ④：证据分析（逐段 LLM 卡片填充此占位符）
+        # ================================================================
+        body_parts.append('<div class="section section-evidence">')
+        body_parts.append('<h2 class="section-title">📊 证据分析</h2>')
+        body_parts.append('<p class="section-desc">以下逐条分析每个子声明及其相关证据，综合判定真实性：</p>')
+        body_parts.append('<div id="claim-sections">{claim_sections}</div>')
+        body_parts.append('</div>')
+
+        # ================================================================
+        # Section ⑤：报告附注
+        # ================================================================
+        body_parts.append(
+            '<div class="section section-metadata report-footer">'
+            '<p>⚠️ 本报告由 SentiGuard 多智能体事实核查系统自动生成，仅供参考，不构成法律建议。</p>'
+            '</div>'
+        )
+
+        return self._wrap_html(title, "\n".join(body_parts), kpis=kpis)
+
     def render_ir(self, document_ir: Dict[str, Any]) -> str:
         """结构化 IR 模式：将文档 IR 渲染为 HTML（主力路径）"""
         title = document_ir.get("title", "事实核查报告")
@@ -720,6 +819,142 @@ class HTMLRenderer(BaseRenderer):
     box-shadow: var(--shadow-sm);
     border: 1px solid var(--border-light);
   }}
+
+  /* ================================================================
+     判定标语 & 报告页脚
+     ================================================================ */
+  .verdict-banner {{
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 24px;
+    margin: 24px 0;
+    border-radius: var(--radius);
+    font-size: 1.1em;
+    font-weight: 600;
+  }}
+  .verdict-banner.true {{ background: var(--good-bg); color: var(--good); border: 1px solid var(--good-light); }}
+  .verdict-banner.false {{ background: var(--bad-bg); color: var(--bad); border: 1px solid var(--bad-light); }}
+  .verdict-banner.uncertain {{ background: var(--neutral-bg); color: var(--neutral); border: 1px solid var(--border); }}
+  .verdict-icon {{ font-size: 1.4em; }}
+  .report-footer {{
+    margin-top: 48px;
+    padding: 20px 0;
+    border-top: 1px solid var(--border);
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.85em;
+  }}
+
+  .verdict-body {{
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }}
+  .verdict-confidence {{
+    font-size: 0.9em;
+    opacity: 0.85;
+  }}
+  .verdict-conclusion {{
+    margin: 8px 0 0;
+    font-size: 0.9em;
+    line-height: 1.7;
+    font-weight: 400;
+    opacity: 0.9;
+  }}
+
+  /* ================================================================
+     报告模板 Section（声明拆解 / 证据分析 / 附注）
+     ================================================================ */
+  .section-title {{
+    font-size: 1.3em;
+    color: var(--accent);
+    margin: 36px 0 8px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--accent);
+    font-weight: 700;
+  }}
+  .section-desc {{
+    color: var(--text-secondary);
+    font-size: 0.9em;
+    margin-bottom: 20px;
+  }}
+  .claim-list {{
+    margin: 12px 0 24px;
+    padding-left: 24px;
+    line-height: 2;
+  }}
+  .claim-list li {{
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-light);
+  }}
+  .claim-list li strong {{
+    color: var(--accent);
+  }}
+
+  /* ================================================================
+     声明分析卡片（逐段 LLM 生成）
+     ================================================================ */
+  .claim-card {{
+    margin: 28px 0;
+    background: var(--surface);
+    border-radius: var(--radius-lg);
+    padding: 28px;
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--border-light);
+  }}
+  .claim-card-header {{
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+  }}
+  .claim-number {{
+    font-size: 1.15em;
+    font-weight: 700;
+    color: var(--accent);
+  }}
+  .claim-type-badge {{
+    display: inline-block;
+    padding: 2px 12px;
+    border-radius: 12px;
+    font-size: 0.82em;
+    font-weight: 600;
+    background: var(--accent-light);
+    color: var(--accent);
+  }}
+  .claim-text {{
+    margin: 12px 0 20px;
+    padding: 14px 18px;
+    background: var(--bg);
+    border-left: 4px solid var(--accent);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    font-style: italic;
+    color: var(--text-secondary);
+    font-size: 0.95em;
+  }}
+  .claim-analysis h4 {{
+    font-size: 1.05em;
+    margin-bottom: 10px;
+    color: var(--text);
+  }}
+  .claim-analysis p {{
+    color: var(--text-secondary);
+    line-height: 1.8;
+    margin-bottom: 16px;
+  }}
+  .evidence-list {{
+    margin: 16px 0;
+  }}
+  .claim-verdict {{
+    margin-top: 20px;
+    padding: 14px 18px;
+    background: var(--accent-light);
+    border-radius: var(--radius);
+    font-size: 0.95em;
+  }}
+  .claim-verdict .verdict-label {{ font-weight: 700; color: var(--accent); }}
+  .claim-verdict .verdict-value {{ color: var(--text); }}
 
   /* ================================================================
      响应式

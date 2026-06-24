@@ -144,6 +144,7 @@ class F3Result(BaseModel):
     analysisDetail: str = Field(default="", description="基于证据的简要分析说明")
     supportCount: int = Field(default=0, ge=0, description="支持证据数量")
     attackCount: int = Field(default=0, ge=0, description="反驳证据数量")
+    neutralCount: int = Field(default=0, ge=0, description="中性证据数量")
 
 
 class F3Report(BaseModel):

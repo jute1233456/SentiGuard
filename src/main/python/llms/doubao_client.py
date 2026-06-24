@@ -78,6 +78,7 @@ class DoubaoLLM(BaseLLM):
             model=self.model_name,
             messages=messages,
             temperature=kwargs.get("temperature", self.temperature),
+            max_tokens=kwargs.get("max_tokens", self.max_tokens),
         )
         return response.choices[0].message.content or ""
 
@@ -107,6 +108,7 @@ class DoubaoLLM(BaseLLM):
                 model=self.model_name,
                 messages=messages,
                 temperature=kwargs.get("temperature", self.temperature),
+                max_tokens=kwargs.get("max_tokens", self.max_tokens),
                 response_format={"type": "json_object"},
             )
         except Exception:
@@ -115,6 +117,7 @@ class DoubaoLLM(BaseLLM):
                 model=self.model_name,
                 messages=messages,
                 temperature=kwargs.get("temperature", self.temperature),
+                max_tokens=kwargs.get("max_tokens", self.max_tokens),
             )
 
         content = response.choices[0].message.content or "{}"
@@ -156,6 +159,7 @@ class DoubaoLLM(BaseLLM):
             api_key=self.api_key,
             base_url=self.base_url,
             temperature=self.temperature,
+            max_tokens=self.max_tokens,
             timeout=60.0,
         )
 

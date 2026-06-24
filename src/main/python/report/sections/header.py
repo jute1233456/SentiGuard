@@ -45,7 +45,7 @@ class HeaderSection(BaseSection):
         # 支持/反驳计数
         if result:
             lines.append(
-                f"**证据统计**：{result.supportCount} 条支持 / {result.attackCount} 条反驳\n"
+                f"**证据统计**：{result.supportCount} 条支持 / {result.attackCount} 条反驳 / {result.neutralCount} 条中性\n"
             )
 
         lines.append("---\n")

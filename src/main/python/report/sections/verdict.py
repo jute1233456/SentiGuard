@@ -29,8 +29,8 @@ class VerdictSection(BaseSection):
         if result.analysisDetail:
             lines.append(f"**分析说明**：\n\n{result.analysisDetail}\n\n")
 
-        if result.supportCount > 0 or result.attackCount > 0:
-            lines.append(f"**证据权衡**：{result.supportCount} 条证据支持，{result.attackCount} 条证据反驳\n")
+        if result.supportCount > 0 or result.attackCount > 0 or result.neutralCount > 0:
+            lines.append(f"**证据权衡**：{result.supportCount} 条支持，{result.attackCount} 条反驳，{result.neutralCount} 条中性\n")
 
         if result.confidenceScore is not None:
             lines.append(f"**综合置信度**：{result.confidenceScore}/100\n")

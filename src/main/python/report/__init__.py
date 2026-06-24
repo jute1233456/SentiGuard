@@ -17,12 +17,13 @@
     # result.content 为完整 HTML 页面（结构化 IR 渲染）
     # result.format == "html"
 """
-from .generator import ReportGenerator, LLMReportGenerator
+from .generator import ReportGenerator, LLMReportGenerator, DeepLLMReportGenerator
 from .models import ReportData, ReportResult, SectionOutput
 
 __all__ = [
     "ReportGenerator",
     "LLMReportGenerator",
+    "DeepLLMReportGenerator",
     "ReportData",
     "ReportResult",
     "SectionOutput",

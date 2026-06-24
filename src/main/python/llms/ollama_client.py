@@ -44,7 +44,10 @@ class OllamaLLM(BaseLLM):
             model=self.model_name,
             messages=messages,
             stream=False,
-            options={"temperature": kwargs.get("temperature", self.temperature)},
+            options={
+                "temperature": kwargs.get("temperature", self.temperature),
+                "num_predict": kwargs.get("max_tokens", self.max_tokens),
+            },
         )
         return response.get("message", {}).get("content", "")
 
@@ -63,7 +66,10 @@ class OllamaLLM(BaseLLM):
             messages=messages,
             stream=False,
             format=json_schema if json_schema is not None else "json",
-            options={"temperature": kwargs.get("temperature", self.temperature)},
+            options={
+                "temperature": kwargs.get("temperature", self.temperature),
+                "num_predict": kwargs.get("max_tokens", self.max_tokens),
+            },
         )
         content = response.get("message", {}).get("content", "{}")
         try:
@@ -74,4 +80,5 @@ class OllamaLLM(BaseLLM):
     # ------------------------------------------------------------------
     def as_langchain_chat_model(self) -> BaseChatModel:
         """返回 LangChain ChatOllama 实例。"""
-        return ChatOllama(model=self.model_name, temperature=self.temperature)
+        return ChatOllama(model=self.model_name, temperature=self.temperature,
+                         num_predict=self.max_tokens)
