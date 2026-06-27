@@ -104,7 +104,12 @@ public class FactCheckController {
         AnalysisReportVO report = factCheckService.getReportByTaskId(taskId);
         byte[] pdfBytes = htmlReportPdfService.renderPdf(report.getContent());
         String filename = "fact-check-report-" + taskId + ".pdf";
-        String encodedFilename = URLEncoder.encode(filename, StandardCharsets.UTF_8).replace("+", "%20");
+        String encodedFilename;
+        try {
+            encodedFilename = URLEncoder.encode(filename, StandardCharsets.UTF_8.name()).replace("+", "%20");
+        } catch (java.io.UnsupportedEncodingException e) {
+            throw new IllegalStateException("UTF-8 encoding not supported", e);
+        }
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_PDF)
                 .header(HttpHeaders.CONTENT_DISPOSITION,

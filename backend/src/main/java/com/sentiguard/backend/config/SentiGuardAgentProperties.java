@@ -17,6 +17,9 @@ public class SentiGuardAgentProperties {
     private String deepFactCheckPath = "/internal/v1/fact-check/deep";
 
     private String opinionAnalyzePath = "/internal/v1/opinion/analyze";
+
+    private String collectPath = "/internal/v1/collect";
+
     private String internalToken = "dev-internal-token";
 
     private int connectTimeoutMs = 10000;

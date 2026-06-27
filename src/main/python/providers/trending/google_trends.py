@@ -16,6 +16,12 @@ from typing import List
 
 import requests
 
+from src.main.python.providers.trending.base import (
+    BaseTrendingCollector,
+    TrendingItem,
+    register_trending_collector,
+)
+
 logger = logging.getLogger(__name__)
 
 HEADERS = {
@@ -38,23 +44,10 @@ GEO_MAP = {
 }
 
 
-class GoogleTrendsHotItem:
-    """Google Trends 热搜单条数据"""
-
-    def __init__(self, rank: int, title: str, heat: float, url: str = "", summary: str = ""):
-        self.rank = rank
-        self.title = title
-        self.heat = heat
-        self.url = url
-        self.summary = summary
-
-    def __repr__(self) -> str:
-        return f"#{self.rank} {self.title} (热度:{self.heat})"
-
-
-class GoogleTrendsCollector:
+class GoogleTrendsCollector(BaseTrendingCollector):
     """Google Trends 采集器 — 通过 RSS Feed 提取热门搜索词"""
 
+    SOURCE_NAME = "google_trends"
     RSS_URL = "https://trends.google.com/trending/rss"
     DEFAULT_GEO = "US"
     DEFAULT_LIMIT = 100
@@ -71,8 +64,12 @@ class GoogleTrendsCollector:
             geo = "US"
         self.geo = geo
 
-    def fetch(self, limit: int = DEFAULT_LIMIT) -> List[GoogleTrendsHotItem]:
-        """拉取 Google Trends 热门搜索 RSS feed。"""
+    def fetch(self, limit: int = DEFAULT_LIMIT) -> List[TrendingItem]:
+        """拉取 Google Trends 热门搜索 RSS feed。
+
+        Args:
+            limit: 返回热搜数量上限（默认100）
+        """
         # 方式 1: RSS feed
         try:
             resp = requests.get(
@@ -117,7 +114,7 @@ class GoogleTrendsCollector:
 
         raise RuntimeError(f"未能从 Google Trends (geo={self.geo}) 获取数据")
 
-    def _parse_rss(self, xml_text: str, limit: int) -> List[GoogleTrendsHotItem]:
+    def _parse_rss(self, xml_text: str, limit: int) -> List[TrendingItem]:
         """解析 Google Trends RSS XML 响应。
 
         RSS 结构：
@@ -132,9 +129,8 @@ class GoogleTrendsCollector:
               </channel>
             </rss>
         """
-        items: List[GoogleTrendsHotItem] = []
+        items: List[TrendingItem] = []
 
-        # 用正则提取每个 <item> 块
         item_blocks = re.findall(r'<item>(.*?)</item>', xml_text, re.DOTALL)
         for i, block in enumerate(item_blocks[:limit]):
             # 提取标题
@@ -166,12 +162,14 @@ class GoogleTrendsCollector:
             desc_match = re.search(r'<description>(.*?)</description>', block)
             summary = desc_match.group(1).strip() if desc_match else ""
 
-            items.append(GoogleTrendsHotItem(
+            items.append(TrendingItem(
                 rank=i + 1,
                 title=title,
                 heat=heat,
                 url=url,
                 summary=summary,
+                source_name=self.SOURCE_NAME,
+                raw_data={"geo": self.geo, "traffic_raw": traffic_raw},
             ))
 
         return items
@@ -188,7 +186,6 @@ class GoogleTrendsCollector:
         if not traffic_text:
             return self._estimate_by_rank(rank)
 
-        # 去除逗号和加号
         cleaned = traffic_text.replace(",", "").replace("+", "").strip()
         try:
             raw = int(cleaned)
@@ -208,3 +205,7 @@ class GoogleTrendsCollector:
     def _estimate_by_rank(self, rank: int) -> float:
         """根据排名估算热度分（0-100）"""
         return round(max(100.0 - (rank - 1) * 2.0, 10.0), 1)
+
+
+# 自注册到全局注册表
+register_trending_collector("google_trends", GoogleTrendsCollector)

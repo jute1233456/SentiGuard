@@ -9,7 +9,7 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://127.0.0.1:3306/sentiguard?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
     username: ${MYSQL_USERNAME:root}
-    password: ${MYSQL_PASSWORD:nilihai2580...}
+    password: ${MYSQL_PASSWORD:gjh !}
 
 mybatis-plus:
   mapper-locations: classpath*:/mapper/**/*.xml
@@ -34,6 +34,8 @@ sentiguard:
     fact-check-path: /internal/v1/fact-check/detail/db
     quick-fact-check-path: /internal/v1/fact-check/quick
     deep-fact-check-path: /internal/v1/fact-check/deep
+    collect-path: /internal/v1/collect
+    opinion-analyze-path: /internal/v1/opinion/analyze
     internal-token: ${SENTIGUARD_INTERNAL_TOKEN:dev-internal-token}
     connect-timeout-ms: 10000
     read-timeout-ms: 300000

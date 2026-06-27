@@ -41,7 +41,8 @@ public class DashboardController {
     }
 
     @PostMapping("/news/collect")
-    public Result<CollectResultVO> triggerCollect() {
-        return Result.ok(hotspotService.triggerCollect());
+    public Result<CollectResultVO> triggerCollect(
+            @RequestParam(defaultValue = "BAIDU") String sources) {
+        return Result.ok(hotspotService.triggerCollect(sources));
     }
 }

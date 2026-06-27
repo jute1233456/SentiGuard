@@ -14,5 +14,5 @@ public interface HotspotService {
 
     HotspotVO getHotspotDetail(Long id);
 
-    CollectResultVO triggerCollect();
+    CollectResultVO triggerCollect(String sources);
 }

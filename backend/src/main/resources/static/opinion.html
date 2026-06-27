@@ -5,8 +5,175 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SentiGuard - 舆情观点分析</title>
 <style>
-:root{--bg:#edf2f6;--surface:#fff;--ink:#172331;--muted:#647386;--line:#d7e1ea;--nav:#243545;--nav-dark:#192938;--blue:#1f78b5;--teal:#16878d;--green:#158147;--red:#c93a3a;--amber:#a65f00;--green-soft:#ddf5e7;--red-soft:#fde8e8;--amber-soft:#fff0cc;--shadow:0 18px 38px rgba(21,38,55,.09);--shadow-soft:0 10px 22px rgba(21,38,55,.06)}
-*{box-sizing:border-box}body{margin:0;min-height:100vh;color:var(--ink);background:var(--bg);font-family:"Microsoft YaHei",Arial,sans-serif}button,input,textarea{font:inherit}button{border:0;cursor:pointer}.app{min-height:100vh;display:grid;grid-template-columns:260px minmax(0,1fr)}.sidebar{width:260px;background:var(--nav);color:#dbe7f0;border-right:1px solid #182635}.brand{height:82px;display:flex;align-items:center;gap:12px;padding:0 22px;background:var(--nav-dark);border-bottom:1px solid rgba(255,255,255,.08)}.brand-mark{width:38px;height:38px;display:grid;place-items:center;border-radius:7px;color:#102a3b;background:#f3c84b;font-weight:900}.brand-name{font-size:18px;font-weight:900;line-height:1.1;color:#f5fbff}.brand-desc{margin-top:4px;color:#9eb0bf;font-size:12px}.nav-block{padding:18px 14px 8px}.nav-title{padding:0 10px 9px;color:#91a5b6;font-size:12px;font-weight:900}.nav-item{width:100%;min-height:44px;display:grid;grid-template-columns:24px 1fr auto;align-items:center;gap:10px;padding:0 12px;border-radius:6px;background:transparent;color:#dbe7f0;text-align:left;font-weight:900;text-decoration:none}.nav-item+.nav-item{margin-top:5px}.nav-item:hover{background:rgba(255,255,255,.08)}.nav-item.active{background:var(--blue);color:#fff}.badge{min-width:42px;height:22px;display:inline-flex;align-items:center;justify-content:center;padding:0 8px;border-radius:999px;font-size:12px;font-weight:900;white-space:nowrap;color:#566a7d;background:#e5edf4}.badge.live{color:#0a5b3b;background:#cfeedd}.main{min-width:0;display:grid;grid-template-rows:66px minmax(0,1fr)}.topbar{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:0 28px;background:#fff;border-bottom:1px solid var(--line)}.crumb{color:var(--muted);font-size:13px;font-weight:900}.topbar-right{display:flex;align-items:center;gap:10px}.content{padding:26px 32px 40px;overflow:auto}.hero{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;margin-bottom:18px}.eyebrow{color:#00707a;font-weight:900;font-size:13px}.hero h1{margin:6px 0 6px;color:#07324d;font-size:34px;letter-spacing:0}.hero p{margin:0;color:#53677b;line-height:1.7}.panel{background:var(--surface);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow-soft);overflow:hidden}.panel+.panel{margin-top:16px}.panel-head{min-height:58px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 18px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#fff,#fbfdfe)}.panel-title{color:#0a3854;font-weight:900;font-size:18px}.panel-sub{margin-top:3px;color:var(--muted);font-size:12px;font-weight:900}.panel-body{padding:18px}.form-grid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;align-items:end}.field label{display:block;margin-bottom:7px;color:#123a56;font-weight:900;font-size:13px}.field input,.field textarea{width:100%;border:1px solid #c7d7e4;border-radius:7px;background:#fbfdfe;color:var(--ink);outline:none}.field input{height:44px;padding:0 13px}.field textarea{min-height:96px;resize:vertical;padding:12px 13px;line-height:1.7}.actions{display:flex;gap:10px;justify-content:flex-end}.btn{height:42px;min-width:104px;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:0 16px;border-radius:7px;color:#fff;background:var(--teal);font-weight:900}.btn.ghost{color:#24475f;background:#fff;border:1px solid var(--line)}.btn:disabled{opacity:.65;cursor:not-allowed}.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.metric{background:#fbfdfe;border:1px solid var(--line);border-radius:8px;padding:14px 16px}.metric-label{color:var(--muted);font-size:12px;font-weight:900}.metric-value{margin-top:6px;color:#07324d;font-size:24px;font-weight:900}.summary-card{border:1px solid #cfe0eb;border-radius:8px;background:linear-gradient(135deg,#fafdff,#fff);padding:18px}.summary-title{font-size:20px;font-weight:900;color:#07324d;margin-bottom:8px}.summary-text{color:#24475f;line-height:1.75;white-space:pre-wrap}.chips{display:flex;flex-wrap:wrap;gap:8px}.chip{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:999px;font-size:12px;font-weight:900;background:#eef6fa;color:#25597a}.chip.high,.chip.critical{background:var(--red-soft);color:var(--red)}.chip.medium{background:var(--amber-soft);color:var(--amber)}.chip.low{background:var(--green-soft);color:var(--green)}.two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px}.bar-list{display:grid;gap:10px}.bar-row{display:grid;grid-template-columns:86px minmax(0,1fr) 54px;gap:10px;align-items:center}.bar-name{font-weight:900;color:#24475f}.bar-track{height:10px;border-radius:999px;background:#e9f1f6;overflow:hidden}.bar-fill{height:100%;border-radius:999px;background:var(--blue)}.bar-value{text-align:right;color:var(--muted);font-weight:900}.cluster,.opinion{border:1px solid var(--line);border-radius:8px;background:#fbfdfe;padding:14px}.cluster+.cluster,.opinion+.opinion{margin-top:10px}.item-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:8px}.item-title{font-weight:900;color:#0b3855}.item-text{color:#31536b;line-height:1.65}.muted{color:var(--muted);font-size:12px}.tag{display:inline-flex;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:900}.support,.positive{background:var(--green-soft);color:var(--green)}.oppose,.negative{background:var(--red-soft);color:var(--red)}.neutral,.mixed{background:var(--amber-soft);color:var(--amber)}.empty{min-height:160px;display:grid;place-items:center;border:1px dashed #c5d7e5;border-radius:8px;color:#7a8fa2;background:#fbfdfe}.report-modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(15,27,40,.45);z-index:50;padding:24px}.report-modal.show{display:flex}.report-dialog{width:min(1120px,96vw);height:min(820px,92vh);background:#fff;border-radius:10px;box-shadow:0 24px 70px rgba(0,0,0,.25);display:grid;grid-template-rows:58px minmax(0,1fr);overflow:hidden}.report-head{display:flex;align-items:center;justify-content:space-between;padding:0 18px;border-bottom:1px solid var(--line);font-weight:900;color:#07324d}.report-frame{width:100%;height:100%;border:0}.toast{position:fixed;right:24px;bottom:24px;max-width:430px;padding:13px 15px;border-radius:8px;color:#fff;background:#1f2937;box-shadow:var(--shadow);opacity:0;transform:translateY(10px);transition:.2s;z-index:70}.toast.show{opacity:1;transform:translateY(0)}.toast.error{background:var(--red)}.toast.success{background:var(--green)}@media(max-width:1180px){.form-grid,.two-col,.metrics{grid-template-columns:1fr}.hero{display:block}.actions{justify-content:flex-start}}
+/* ===== Design System (shared with dashboard) ===== */
+:root {
+  --bg: #f0f2f5; --surface: #ffffff; --text: #1a1a2e; --text-secondary: #5a6178;
+  --muted: #8b92a8; --border: #e2e6ef; --border-light: #eef0f6;
+  --accent: #4361ee; --accent-gradient: linear-gradient(135deg, #4361ee, #3a0ca3);
+  --good: #2d6a4f; --good-bg: #d8f3dc;
+  --bad: #9b2226; --bad-bg: #f8d7da;
+  --warn: #e8590c; --warn-bg: #fff4e6;
+  --info: #1f78b5; --info-bg: #dff0fc;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.06);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.08);
+  --radius: 10px; --radius-lg: 14px;
+  --nav: #1a1d2e;
+  --hero-gradient: linear-gradient(135deg, #16878d 0%, #0d7377 50%, #1a1d2e 100%);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0a0a14; --surface: #141420; --text: #e4e6f0; --text-secondary: #9ca3af;
+    --muted: #6b7280; --border: #2a2a3e; --border-light: #1f1f32;
+    --accent: #2dd4bf; --accent-gradient: linear-gradient(135deg, #2dd4bf, #14b8a6);
+    --good: #52b788; --good-bg: #1b3a2a;
+    --bad: #ef4444; --bad-bg: #3b1a1a;
+    --warn: #ff922b; --warn-bg: #2d1f0a;
+    --info: #60a5fa; --info-bg: #1e3a5f;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.15);
+    --shadow-md: 0 4px 16px rgba(0,0,0,0.25);
+    --shadow-lg: 0 8px 32px rgba(0,0,0,0.35);
+    --nav: #0d0d1a;
+    --hero-gradient: linear-gradient(135deg, #134e4a 0%, #0f172a 50%, #0a0a14 100%);
+  }
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { color: var(--text); background: var(--bg); font-family: "Microsoft YaHei", -apple-system, Arial, sans-serif; line-height: 1.5; min-height: 100vh; }
+a { color: var(--accent); text-decoration: none; }
+button, input, textarea, select { font: inherit; }
+button { border: 0; cursor: pointer; transition: all 0.2s; }
+
+/* Layout */
+.app { min-height: 100vh; display: grid; grid-template-columns: 260px minmax(0,1fr); }
+.sidebar { background: var(--nav); color: #c8d2e0; display: flex; flex-direction: column; }
+.brand { height: 82px; display: flex; align-items: center; gap: 12px; padding: 0 22px; background: rgba(0,0,0,0.2); border-bottom: 1px solid rgba(255,255,255,0.06); flex-shrink: 0; }
+.brand-mark { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 10px; color: #102a3b; background: linear-gradient(135deg, #f3c84b, #f59e0b); font-weight: 900; font-size: 18px; }
+.brand-name { font-size: 18px; font-weight: 900; color: #f0f4ff; }
+.brand-desc { margin-top: 2px; color: #8899b4; font-size: 11px; }
+.nav-block { padding: 18px 14px; flex: 1; }
+.nav-title { padding: 0 10px 10px; color: #6b7d95; font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px; }
+.nav-item { width: 100%; min-height: 44px; display: grid; grid-template-columns: 24px 1fr auto; align-items: center; gap: 8px; padding: 0 12px; border-radius: 8px; background: transparent; color: #c8d2e0; text-align: left; font-weight: 600; font-size: 14px; text-decoration: none; transition: all 0.15s; margin-bottom: 3px; }
+.nav-item:hover { background: rgba(255,255,255,0.06); color: #fff; }
+.nav-item.active { background: var(--accent); color: #fff; box-shadow: 0 2px 8px rgba(45,212,191,0.3); }
+.nav-badge { min-width: 40px; height: 20px; display: inline-flex; align-items: center; justify-content: center; padding: 0 8px; border-radius: 999px; font-size: 11px; font-weight: 900; color: #6b7d95; background: rgba(255,255,255,0.08); }
+.nav-item.active .nav-badge { color: #fff; background: rgba(255,255,255,0.2); }
+
+.main { min-width: 0; display: grid; grid-template-rows: 66px minmax(0,1fr); }
+.topbar { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 0 28px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.crumb { color: var(--muted); font-size: 13px; font-weight: 600; }
+.topbar-right { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.content { padding: 24px 28px 40px; overflow: auto; }
+
+/* Hero */
+.hero { background: var(--hero-gradient); border-radius: var(--radius-lg); padding: 28px 32px; margin-bottom: 20px; position: relative; overflow: hidden; color: #fff; display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; }
+.hero::before { content: ''; position: absolute; top: -40px; right: -30px; width: 180px; height: 180px; border-radius: 50%; background: rgba(255,255,255,0.04); }
+.hero::after { content: ''; position: absolute; bottom: -50px; left: 20%; width: 200px; height: 200px; border-radius: 50%; background: rgba(255,255,255,0.03); }
+.hero-left { position: relative; z-index: 1; }
+.hero-eyebrow { font-size: 12px; font-weight: 700; opacity: 0.8; text-transform: uppercase; letter-spacing: 1px; }
+.hero h1 { margin: 6px 0; font-size: 26px; font-weight: 900; }
+.hero p { margin: 0; font-size: 14px; opacity: 0.75; }
+
+/* Panels */
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-sm); overflow: hidden; }
+.panel+.panel { margin-top: 16px; }
+.panel-head { min-height: 54px; display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--border); background: var(--border-light); }
+.panel-title { color: var(--text); font-weight: 700; font-size: 16px; }
+.panel-sub { margin-top: 2px; color: var(--muted); font-size: 12px; }
+.panel-body { padding: 18px; }
+
+/* Form */
+.form-grid { display: grid; grid-template-columns: minmax(0,1fr) 260px; gap: 14px; align-items: end; }
+.field label { display: block; margin-bottom: 6px; color: var(--text); font-weight: 700; font-size: 13px; }
+.field input, .field textarea { width: 100%; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); outline: none; transition: all 0.2s; padding: 0 14px; }
+.field input:focus, .field textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(67,97,238,0.1); }
+.field input { height: 44px; }
+.field textarea { min-height: 96px; resize: vertical; padding: 12px 14px; line-height: 1.7; }
+.actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+/* Buttons */
+.btn { height: 38px; padding: 0 16px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-weight: 700; font-size: 13px; white-space: nowrap; transition: all 0.2s; }
+.btn-primary { color: #fff; background: var(--accent); }
+.btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); box-shadow: var(--shadow-md); }
+.btn-ghost { color: var(--text-secondary); background: transparent; border: 1px solid var(--border); }
+.btn-ghost:hover { background: var(--border-light); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; }
+
+/* KPI Row */
+.metrics { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 12px; margin-bottom: 16px; }
+.kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; position: relative; overflow: hidden; transition: all 0.2s; }
+.kpi-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+.kpi-card.accent::before { background: var(--accent); }
+.kpi-card.good::before { background: var(--good); }
+.kpi-card.bad::before { background: var(--bad); }
+.kpi-card.warn::before { background: var(--warn); }
+.kpi-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; }
+.kpi-value { margin-top: 6px; font-size: 24px; font-weight: 900; color: var(--text); }
+
+/* Summary Card */
+.summary-card { border: 1px solid var(--border); border-radius: var(--radius); background: var(--border-light); padding: 20px; margin-top: 0; }
+.summary-title { font-size: 18px; font-weight: 900; color: var(--text); margin-bottom: 8px; }
+.summary-text { color: var(--text-secondary); line-height: 1.75; white-space: pre-wrap; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; background: var(--info-bg); color: var(--info); }
+.chip.high, .chip.critical { background: var(--bad-bg); color: var(--bad); }
+.chip.medium { background: var(--warn-bg); color: var(--warn); }
+.chip.low { background: var(--good-bg); color: var(--good); }
+
+/* Distribution Bars */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
+.bar-list { display: grid; gap: 8px; }
+.bar-row { display: grid; grid-template-columns: 80px minmax(0,1fr) 54px; gap: 10px; align-items: center; }
+.bar-name { font-weight: 700; font-size: 12px; color: var(--text-secondary); }
+.bar-track { height: 10px; border-radius: 999px; background: var(--border); overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 999px; transition: width 0.4s ease; }
+.bar-fill.support, .bar-fill.pos, .bar-fill.positive { background: var(--good); }
+.bar-fill.oppose, .bar-fill.neg, .bar-fill.negative { background: var(--bad); }
+.bar-fill.neutral, .bar-fill.neu, .bar-fill.mixed { background: var(--warn); }
+.bar-value { text-align: right; color: var(--muted); font-weight: 700; font-size: 12px; }
+
+/* Cluster & Opinion Cards */
+.cluster, .opinion { border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; transition: all 0.2s; }
+.cluster:hover, .opinion:hover { box-shadow: var(--shadow-sm); }
+.cluster+.cluster, .opinion+.opinion { margin-top: 10px; }
+.cluster { border-left: 4px solid var(--border); }
+.cluster.stance-support, .cluster.stance-positive { border-left-color: var(--good); background: var(--good-bg); }
+.cluster.stance-oppose, .cluster.stance-negative { border-left-color: var(--bad); background: var(--bad-bg); }
+.cluster.stance-neutral, .cluster.stance-mixed { border-left-color: var(--warn); background: var(--warn-bg); }
+.opinion { background: var(--surface); }
+.item-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.item-title { font-weight: 700; color: var(--text); }
+.item-text { color: var(--text-secondary); line-height: 1.65; font-size: 13px; }
+.muted { color: var(--muted); font-size: 12px; }
+
+/* Tags */
+.tag { display: inline-flex; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+.tag.support, .tag.pos, .tag.positive { color: var(--good); background: var(--good-bg); }
+.tag.oppose, .tag.neg, .tag.negative { color: var(--bad); background: var(--bad-bg); }
+.tag.neutral, .tag.neu, .tag.mixed { color: var(--warn); background: var(--warn-bg); }
+
+/* Skeleton Loading */
+@keyframes shimmer { 0%{background-position:-200px 0}100%{background-position:calc(200px + 100%) 0} }
+.skeleton { background: linear-gradient(90deg, var(--border-light) 25%, var(--border) 37%, var(--border-light) 63%); background-size: 200px 100%; animation: shimmer 1.4s ease infinite; border-radius: 6px; }
+.skeleton-kpi { height: 80px; border-radius: var(--radius); }
+.skeleton-card { height: 120px; border-radius: var(--radius); margin-bottom: 10px; }
+
+/* Empty State */
+.empty { min-height: 160px; display: grid; place-items: center; border: 2px dashed var(--border); border-radius: var(--radius); color: var(--muted); background: var(--border-light); font-weight: 600; }
+
+/* Report Modal */
+.report-modal { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(10,10,20,0.5); backdrop-filter: blur(4px); z-index: 50; padding: 24px; }
+.report-modal.show { display: flex; }
+.report-dialog { width: min(1120px,96vw); height: min(820px,92vh); background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); display: grid; grid-template-rows: 56px minmax(0,1fr); overflow: hidden; }
+.report-head { display: flex; align-items: center; justify-content: space-between; padding: 0 18px; border-bottom: 1px solid var(--border); font-weight: 700; color: var(--text); background: var(--border-light); }
+.report-frame { width: 100%; height: 100%; border: 0; }
+
+/* Toast */
+.toast { position: fixed; right: 24px; bottom: 24px; max-width: 420px; padding: 12px 18px; border-radius: 10px; color: #fff; background: var(--text); box-shadow: var(--shadow-lg); opacity: 0; transform: translateY(8px); transition: all 0.25s; z-index: 70; font-size: 13px; font-weight: 600; }
+.toast.show { opacity: 1; transform: translateY(0); }
+.toast.error { background: var(--bad); }
+.toast.success { background: var(--good); }
+
+@media(max-width:1180px){ .form-grid,.two-col,.metrics{grid-template-columns:1fr}.hero{display:block}.actions{justify-content:flex-start} }
 </style>
 </head>
 <body>
@@ -15,62 +182,158 @@
     <div class="brand"><div class="brand-mark">SG</div><div><div class="brand-name">SentiGuard</div><div class="brand-desc">舆情监测与事实核查平台</div></div></div>
     <div class="nav-block">
       <div class="nav-title">功能导航</div>
-      <a href="/dashboard.html" class="nav-item"><span>🔥</span><span>舆情监测</span><span class="badge live">实时</span></a>
-      <a href="/opinion.html" class="nav-item active"><span>◉</span><span>观点分析</span><span class="badge live">分析</span></a>
-      <a href="/" class="nav-item"><span>✓</span><span>核查工作台</span><span class="badge">提交</span></a>
-      <a href="/history.html" class="nav-item"><span>▤</span><span>核查历史</span><span class="badge live">在线</span></a>
+      <a href="/dashboard.html" class="nav-item"><span>🔥</span><span>舆情监测</span><span class="nav-badge">实时</span></a>
+      <a href="/opinion.html" class="nav-item active"><span>◉</span><span>观点分析</span><span class="nav-badge">分析</span></a>
+      <a href="/" class="nav-item"><span>✓</span><span>核查工作台</span><span class="nav-badge">提交</span></a>
+      <a href="/history.html" class="nav-item"><span>▤</span><span>核查历史</span><span class="nav-badge">在线</span></a>
     </div>
   </aside>
   <main class="main">
-    <header class="topbar"><div class="crumb">平台工作台 / 舆情观点分析</div><div class="topbar-right"><span id="currentUser" style="color:var(--blue);font-weight:900;font-size:13px;">用户</span><button id="logoutBtn" class="btn ghost" type="button" style="height:32px;min-width:60px;font-size:12px;">退出</button></div></header>
+    <header class="topbar"><div class="crumb">平台工作台 / 舆情观点分析</div><div class="topbar-right"><span id="currentUser" style="color:var(--accent);font-weight:700;font-size:13px;">用户</span><button id="logoutBtn" class="btn btn-ghost" type="button" style="height:30px;font-size:12px;min-width:60px;">退出</button></div></header>
     <section class="content">
-      <section class="hero"><div><div class="eyebrow">Opinion Intelligence</div><h1>舆情观点分析</h1><p>围绕指定事件搜索公众观点，抽取立场、情绪与核心论点，形成舆论画像和 HTML 分析报告。</p></div><button id="previewReportBtn" class="btn ghost" type="button" disabled>预览报告</button></section>
+      <!-- Hero -->
+      <div class="hero">
+        <div class="hero-left">
+          <div class="hero-eyebrow">Opinion Intelligence</div>
+          <h1>舆情观点分析</h1>
+          <p>围绕指定事件搜索公众观点，抽取立场、情绪与核心论点，形成舆论画像和 HTML 分析报告。</p>
+        </div>
+        <button id="previewReportBtn" class="btn btn-ghost" type="button" disabled style="position:relative;z-index:1;color:#fff;border-color:rgba(255,255,255,0.3);">📄 预览报告</button>
+      </div>
+
+      <!-- Input Form -->
       <section class="panel">
         <div class="panel-head"><div><div class="panel-title">提交分析</div><div class="panel-sub">输入事件名称，必要时补充事件背景</div></div></div>
         <div class="panel-body">
           <form id="opinionForm" class="form-grid">
             <div class="field"><label for="eventInput">事件名称</label><input id="eventInput" required maxlength="500" placeholder="例如：某地文旅局发布新政策引发讨论"></div>
-            <div class="actions"><button id="resetBtn" class="btn ghost" type="button">重置</button><button id="analyzeBtn" class="btn" type="submit">开始分析</button></div>
+            <div class="actions"><button id="resetBtn" class="btn btn-ghost" type="button">重置</button><button id="analyzeBtn" class="btn btn-primary" type="submit">开始分析</button></div>
             <div class="field" style="grid-column:1/-1"><label for="descriptionInput">事件描述</label><textarea id="descriptionInput" maxlength="2000" placeholder="可选：补充事件经过、涉及主体、时间地点或已知争议点。"></textarea></div>
           </form>
         </div>
       </section>
-      <section class="panel">
+
+      <!-- Results -->
+      <section class="panel" style="margin-top:16px">
         <div class="panel-head"><div><div class="panel-title">分析结果</div><div id="resultMeta" class="panel-sub">提交后展示舆论画像</div></div></div>
         <div class="panel-body" id="resultView"><div class="empty">暂无分析结果</div></div>
       </section>
     </section>
   </main>
 </div>
-<div id="reportModal" class="report-modal"><div class="report-dialog"><div class="report-head"><span>舆情观点分析报告</span><button id="closeReportBtn" class="btn ghost" type="button" style="height:34px;min-width:52px;">关闭</button></div><iframe id="reportFrame" class="report-frame" sandbox></iframe></div></div>
+
+<!-- Report Modal -->
+<div id="reportModal" class="report-modal"><div class="report-dialog"><div class="report-head"><span>舆情观点分析报告</span><button id="closeReportBtn" class="btn btn-ghost" type="button" style="height:32px;font-size:12px;">关闭</button></div><iframe id="reportFrame" class="report-frame" sandbox></iframe></div></div>
+
 <div id="toast" class="toast"></div>
+
 <script>
 function getToken(){return localStorage.getItem('sg_token')}function logout(){localStorage.clear();window.location.href='/login.html'}if(!getToken()){window.location.href='/login.html'}
 document.getElementById('currentUser').textContent=localStorage.getItem('sg_nickname')||localStorage.getItem('sg_username')||'用户';document.getElementById('logoutBtn').addEventListener('click',logout);
+
 const el={form:document.getElementById('opinionForm'),eventInput:document.getElementById('eventInput'),descriptionInput:document.getElementById('descriptionInput'),analyzeBtn:document.getElementById('analyzeBtn'),resetBtn:document.getElementById('resetBtn'),resultView:document.getElementById('resultView'),resultMeta:document.getElementById('resultMeta'),previewReportBtn:document.getElementById('previewReportBtn'),reportModal:document.getElementById('reportModal'),reportFrame:document.getElementById('reportFrame'),closeReportBtn:document.getElementById('closeReportBtn'),toast:document.getElementById('toast')};
 let currentResult=null;
-function showToast(msg,type){el.toast.textContent=msg;el.toast.className='toast show '+(type||'');setTimeout(()=>el.toast.className='toast',3000)}
+
+function showToast(msg,type){el.toast.textContent=msg;el.toast.className='toast show '+(type||'');setTimeout(function(){el.toast.className='toast'},3000)}
 function escapeHtml(v){return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 function pct(v){const n=Number(v||0);return n>1?Math.round(n)+'%':Math.round(n*100)+'%'}
-function labelText(v){return {support:'支持',oppose:'反对',neutral:'中立',mixed:'混合',positive:'正面',negative:'负面',low:'低风险',medium:'中风险',high:'高风险',critical:'严重风险'}[v]||v||'-'}
-async function requestJson(url,options={}){const headers={'Content-Type':'application/json',...(options.headers||{})};const token=getToken();if(token)headers.Authorization=`Bearer ${token}`;const res=await fetch(url,{...options,headers});if(res.status===401){logout();throw new Error('请先登录')}const body=await res.json();if(!res.ok||(body.code&&body.code>=400))throw new Error(body.message||'请求失败');return Object.prototype.hasOwnProperty.call(body,'data')?body.data:body}
-function renderBars(title,dist){const entries=Object.entries(dist||{});return `<div class="panel"><div class="panel-head"><div><div class="panel-title">${title}</div></div></div><div class="panel-body"><div class="bar-list">${entries.length?entries.map(([k,v])=>`<div class="bar-row"><div class="bar-name">${escapeHtml(labelText(k))}</div><div class="bar-track"><div class="bar-fill" style="width:${pct(v)}"></div></div><div class="bar-value">${pct(v)}</div></div>`).join(''):'<div class="muted">暂无分布数据</div>'}</div></div></div>`}
-function renderResult(data){currentResult=data;const portrait=data.portrait||{};const searchMeta=data.searchMeta||{};const clusters=data.clusters||portrait.clusters||[];const opinions=data.opinions||[];el.previewReportBtn.disabled=!(data.report&&data.report.reportContent);el.resultMeta.textContent=`已完成 · ${portrait.generatedAt||new Date().toLocaleString()}`;el.resultView.innerHTML=`
-  <div class="metrics">
-    <div class="metric"><div class="metric-label">观点数量</div><div class="metric-value">${escapeHtml(portrait.totalOpinions??opinions.length)}</div></div>
-    <div class="metric"><div class="metric-label">来源数量</div><div class="metric-value">${escapeHtml(portrait.totalSources??searchMeta.sourcesUnique??0)}</div></div>
-    <div class="metric"><div class="metric-label">检索结果</div><div class="metric-value">${escapeHtml(searchMeta.resultsFound??0)}</div></div>
-    <div class="metric"><div class="metric-label">风险等级</div><div class="metric-value"><span class="chip ${escapeHtml(portrait.riskLevel||'low')}">${escapeHtml(labelText(portrait.riskLevel||'low'))}</span></div></div>
-  </div>
-  <div class="panel" style="margin-top:16px"><div class="panel-body"><div class="summary-card"><div class="summary-title">${escapeHtml(portrait.eventName||el.eventInput.value)}</div><div class="summary-text">${escapeHtml(portrait.narrativeSummary||'暂无舆论画像总结。')}</div><div class="chips" style="margin-top:12px">${(portrait.riskNotes||[]).map(n=>`<span class="chip ${escapeHtml(portrait.riskLevel||'low')}">${escapeHtml(n)}</span>`).join('')}</div></div></div></div>
-  <div class="two-col" style="margin-top:16px">${renderBars('立场分布',portrait.stanceDistribution)}${renderBars('情感分布',portrait.sentimentDistribution)}</div>
-  <div class="panel"><div class="panel-head"><div><div class="panel-title">立场簇</div><div class="panel-sub">归并后的主要观点群</div></div></div><div class="panel-body">${clusters.length?clusters.map(c=>`<div class="cluster"><div class="item-head"><div><div class="item-title">${escapeHtml(c.label||('观点簇 '+c.clusterId))}</div><div class="muted">${escapeHtml(c.opinionCount??0)} 条观点 · ${escapeHtml(labelText(c.stance))}</div></div><span class="tag ${escapeHtml(c.stance)}">${escapeHtml(labelText(c.stance))}</span></div><div class="item-text">${escapeHtml(c.summary||'')}</div>${(c.representativeArguments||[]).length?`<div class="chips" style="margin-top:10px">${c.representativeArguments.map(a=>`<span class="chip">${escapeHtml(a)}</span>`).join('')}</div>`:''}</div>`).join(''):'<div class="empty">暂无立场簇数据</div>'}</div></div>
-  <div class="panel"><div class="panel-head"><div><div class="panel-title">原始观点</div><div class="panel-sub">从搜索结果中抽取的观点样本</div></div></div><div class="panel-body">${opinions.length?opinions.slice(0,20).map(o=>`<div class="opinion"><div class="item-head"><div><div class="item-title">${escapeHtml(o.coreArgument||o.sourceTitle||'观点')}</div><div class="muted">${escapeHtml(o.sourceDomain||'未知来源')} · ${escapeHtml(o.speakerType||'未知主体')}</div></div><div><span class="tag ${escapeHtml(o.stance)}">${escapeHtml(labelText(o.stance))}</span> <span class="tag ${escapeHtml(o.sentiment)}">${escapeHtml(labelText(o.sentiment))}</span></div></div><div class="item-text">${escapeHtml(o.excerptText||'')}</div>${o.sourceUrl?`<div class="muted" style="margin-top:8px"><a href="${escapeHtml(o.sourceUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(o.sourceUrl)}</a></div>`:''}</div>`).join(''):'<div class="empty">暂无原始观点数据</div>'}</div></div>`}
-async function analyze(e){e.preventDefault();const event=el.eventInput.value.trim();if(!event){showToast('请输入需要分析的舆情事件','error');return}el.analyzeBtn.disabled=true;el.previewReportBtn.disabled=true;el.analyzeBtn.textContent='分析中...';el.resultMeta.textContent='正在分析';el.resultView.innerHTML='<div class="empty">正在调用舆情观点分析 Agent，请稍候...</div>';try{const data=await requestJson('/api/opinion/analyze',{method:'POST',body:JSON.stringify({event,description:el.descriptionInput.value.trim()})});renderResult(data);showToast('舆情观点分析完成','success')}catch(err){el.resultMeta.textContent='分析失败';el.resultView.innerHTML='<div class="empty">分析失败</div>';showToast(err.message,'error')}finally{el.analyzeBtn.disabled=false;el.analyzeBtn.textContent='开始分析'}}
+function labelText(v){return {support:'支持',oppose:'反对',neutral:'中立',mixed:'混合',positive:'正面',negative:'负面',pos:'正面',neg:'负面',neu:'中性',low:'低风险',medium:'中风险',high:'高风险',critical:'严重风险'}[v]||v||'-'}
+
+async function requestJson(url,options={}){
+  const headers={'Content-Type':'application/json',...(options.headers||{})};
+  const token=getToken();if(token)headers.Authorization='Bearer '+token;
+  const res=await fetch(url,{...options,headers});
+  if(res.status===401){logout();throw new Error('请先登录')}
+  const body=await res.json();
+  if(!res.ok||(body.code&&body.code>=400))throw new Error(body.message||'请求失败');
+  return Object.prototype.hasOwnProperty.call(body,'data')?body.data:body
+}
+
+function renderBars(title,dist){
+  const entries=Object.entries(dist||{});
+  return '<div class="panel" style="margin-top:0"><div class="panel-head"><div class="panel-title">'+escapeHtml(title)+'</div></div><div class="panel-body"><div class="bar-list">'+
+    (entries.length?entries.map(function(_b){
+      var k=_b[0],v=_b[1];var cls='';
+      if(k==='support'||k==='pos'||k==='positive')cls='support';
+      else if(k==='oppose'||k==='neg'||k==='negative')cls='oppose';
+      else cls='neutral';
+      return '<div class="bar-row"><div class="bar-name">'+escapeHtml(labelText(k))+'</div><div class="bar-track"><div class="bar-fill '+cls+'" style="width:'+pct(v)+'"></div></div><div class="bar-value">'+pct(v)+'</div></div>';
+    }).join(''):'<div class="muted">暂无分布数据</div>')+
+    '</div></div></div>';
+}
+
+function showSkeleton(){
+  return '<div class="metrics">'+
+    '<div class="skeleton skeleton-kpi"></div><div class="skeleton skeleton-kpi"></div><div class="skeleton skeleton-kpi"></div><div class="skeleton skeleton-kpi"></div>'+
+    '</div><div class="skeleton skeleton-card"></div><div class="skeleton skeleton-card"></div><div class="skeleton skeleton-card"></div>';
+}
+
+function renderResult(data){
+  currentResult=data;
+  var portrait=data.portrait||{};
+  var searchMeta=data.searchMeta||{};
+  var clusters=data.clusters||portrait.clusters||[];
+  var opinions=data.opinions||[];
+  el.previewReportBtn.disabled=!(data.report&&data.report.reportContent);
+  el.resultMeta.textContent='已完成 · '+(portrait.generatedAt||new Date().toLocaleString());
+
+  // Determine cluster stance class for left border
+  function clusterStanceClass(stance){ return 'stance-'+(stance||'neutral'); }
+
+  el.resultView.innerHTML=
+    '<div class="metrics">'+
+      '<div class="kpi-card accent"><div class="kpi-label">观点数量</div><div class="kpi-value">'+escapeHtml(portrait.totalOpinions??opinions.length)+'</div></div>'+
+      '<div class="kpi-card good"><div class="kpi-label">来源数量</div><div class="kpi-value">'+escapeHtml(portrait.totalSources??searchMeta.sourcesUnique??0)+'</div></div>'+
+      '<div class="kpi-card accent"><div class="kpi-label">检索结果</div><div class="kpi-value">'+escapeHtml(searchMeta.resultsFound??0)+'</div></div>'+
+      '<div class="kpi-card '+(portrait.riskLevel==='high'||portrait.riskLevel==='critical'?'bad':portrait.riskLevel==='medium'?'warn':'good')+'"><div class="kpi-label">风险等级</div><div class="kpi-value"><span class="chip '+escapeHtml(portrait.riskLevel||'low')+'">'+escapeHtml(labelText(portrait.riskLevel||'low'))+'</span></div></div>'+
+    '</div>'+
+    '<div class="summary-card" style="margin-bottom:16px"><div class="summary-title">'+escapeHtml(portrait.eventName||el.eventInput.value)+'</div><div class="summary-text">'+escapeHtml(portrait.narrativeSummary||'暂无舆论画像总结。')+'</div>'+
+      ((portrait.riskNotes||[]).length?'<div class="chips" style="margin-top:12px">'+portrait.riskNotes.map(function(n){return '<span class="chip '+escapeHtml(portrait.riskLevel||'low')+'">'+escapeHtml(n)+'</span>'}).join('')+'</div>':'')+
+    '</div>'+
+    '<div class="two-col">'+renderBars('立场分布',portrait.stanceDistribution)+renderBars('情感分布',portrait.sentimentDistribution)+'</div>'+
+    '<div class="panel" style="margin-bottom:16px"><div class="panel-head"><div><div class="panel-title">立场簇</div><div class="panel-sub">归并后的主要观点群</div></div></div><div class="panel-body">'+
+      (clusters.length?clusters.map(function(c){
+        return '<div class="cluster '+clusterStanceClass(c.stance)+'">'+
+          '<div class="item-head"><div><div class="item-title">'+escapeHtml(c.label||('观点簇 '+c.clusterId))+'</div><div class="muted">'+escapeHtml(c.opinionCount??0)+' 条观点 · '+escapeHtml(labelText(c.stance))+'</div></div><span class="tag '+escapeHtml(c.stance||'neutral')+'">'+escapeHtml(labelText(c.stance))+'</span></div>'+
+          '<div class="item-text">'+escapeHtml(c.summary||'')+'</div>'+
+          ((c.representativeArguments||[]).length?'<div class="chips" style="margin-top:10px">'+c.representativeArguments.map(function(a){return '<span class="chip">'+escapeHtml(a)+'</span>'}).join('')+'</div>':'')+
+        '</div>';
+      }).join(''):'<div class="empty" style="min-height:100px">暂无立场簇数据</div>')+
+    '</div></div>'+
+    '<div class="panel"><div class="panel-head"><div><div class="panel-title">原始观点</div><div class="panel-sub">从搜索结果中抽取的观点样本</div></div></div><div class="panel-body">'+
+      (opinions.length?opinions.slice(0,20).map(function(o){
+        return '<div class="opinion"><div class="item-head"><div><div class="item-title">'+escapeHtml(o.coreArgument||o.sourceTitle||'观点')+'</div><div class="muted">'+escapeHtml(o.sourceDomain||'未知来源')+' · '+escapeHtml(o.speakerType||'未知主体')+'</div></div><div><span class="tag '+escapeHtml(o.stance||'neutral')+'">'+escapeHtml(labelText(o.stance))+'</span> <span class="tag '+escapeHtml(o.sentiment||'neutral')+'">'+escapeHtml(labelText(o.sentiment))+'</span></div></div><div class="item-text">'+escapeHtml(o.excerptText||'')+'</div>'+
+          (o.sourceUrl?'<div class="muted" style="margin-top:8px"><a href="'+escapeHtml(o.sourceUrl)+'" target="_blank" rel="noopener noreferrer">'+escapeHtml(o.sourceUrl)+'</a></div>':'')+
+        '</div>';
+      }).join(''):'<div class="empty" style="min-height:100px">暂无原始观点数据</div>')+
+    '</div></div>';
+}
+
+async function analyze(e){
+  e.preventDefault();
+  var event=el.eventInput.value.trim();
+  if(!event){showToast('请输入需要分析的舆情事件','error');return}
+  el.analyzeBtn.disabled=true;el.previewReportBtn.disabled=true;
+  el.analyzeBtn.textContent='分析中...';
+  el.resultMeta.textContent='正在分析';
+  el.resultView.innerHTML='<div class="panel-body">'+showSkeleton()+'</div>';
+  try{
+    var data=await requestJson('/api/opinion/analyze',{method:'POST',body:JSON.stringify({event:event,description:el.descriptionInput.value.trim()})});
+    renderResult(data);
+    showToast('舆情观点分析完成','success');
+  }catch(err){
+    el.resultMeta.textContent='分析失败';
+    el.resultView.innerHTML='<div class="empty">分析失败: '+escapeHtml(err.message)+'</div>';
+    showToast(err.message,'error');
+  }finally{
+    el.analyzeBtn.disabled=false;el.analyzeBtn.textContent='开始分析';
+  }
+}
+
 function resetPage(){currentResult=null;el.form.reset();el.previewReportBtn.disabled=true;el.resultMeta.textContent='提交后展示舆论画像';el.resultView.innerHTML='<div class="empty">暂无分析结果</div>'}
-function previewReport(){const html=currentResult&&currentResult.report&&currentResult.report.reportContent;if(!html){showToast('暂无可预览的报告','error');return}el.reportFrame.srcdoc=html;el.reportModal.classList.add('show')}
+function previewReport(){var html=currentResult&&currentResult.report&&currentResult.report.reportContent;if(!html){showToast('暂无可预览的报告','error');return}el.reportFrame.srcdoc=html;el.reportModal.classList.add('show')}
 function closeReport(){el.reportModal.classList.remove('show');el.reportFrame.srcdoc=''}
-el.form.addEventListener('submit',analyze);el.resetBtn.addEventListener('click',resetPage);el.previewReportBtn.addEventListener('click',previewReport);el.closeReportBtn.addEventListener('click',closeReport);el.reportModal.addEventListener('click',e=>{if(e.target===el.reportModal)closeReport()});
+el.form.addEventListener('submit',analyze);el.resetBtn.addEventListener('click',resetPage);el.previewReportBtn.addEventListener('click',previewReport);el.closeReportBtn.addEventListener('click',closeReport);el.reportModal.addEventListener('click',function(e){if(e.target===el.reportModal)closeReport()});
 </script>
 </body>
 </html>

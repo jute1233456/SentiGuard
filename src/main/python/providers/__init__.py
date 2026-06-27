@@ -26,7 +26,17 @@ from src.main.python.providers.search import (
     list_search_engines,
 )
 # Trending
-from src.main.python.providers.trending import BaiduCollector, BaiduHotItem
+from src.main.python.providers.trending import (
+    BaseTrendingCollector,
+    TrendingItem,
+    TrendingRegistry,
+    register_trending_collector,
+    get_trending_collector,
+    list_trending_collectors,
+    BaiduCollector,
+    GoogleTrendsCollector,
+    ToutiaoCollector,
+)
 # Data
 from src.main.python.providers.data import (
     BaseDataSource,
@@ -44,7 +54,9 @@ __all__ = [
     "BaseSearchEngine", "SearchResult", "SearchQuery", "SearchEngineRegistry",
     "register_search_engine", "get_search_engine", "list_search_engines",
     # Trending
-    "BaiduCollector", "BaiduHotItem",
+    "BaseTrendingCollector", "TrendingItem", "TrendingRegistry",
+    "register_trending_collector", "get_trending_collector", "list_trending_collectors",
+    "BaiduCollector", "GoogleTrendsCollector", "ToutiaoCollector",
     # Data
     "BaseDataSource", "DOC_COLUMNS", "merge_sources",
     "GDELTClient", "RSSClient", "THUCNewsLoader",

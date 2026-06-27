@@ -73,18 +73,30 @@ def list_hotspots(
 @router.post(
     "/collect",
     response_model=ApiResponse[dict],
-    summary="手动触发一次百度热搜采集与分析",
+    summary="手动触发多源热搜采集与分析",
 )
 def trigger_collect(
-    source: str = Query("BAIDU", description="采集来源：BAIDU"),
+    sources: str = Query("BAIDU", description="采集来源，逗号分隔：BAIDU,TOUTIAO,GOOGLE_TRENDS"),
 ) -> ApiResponse[dict]:
+    # 解析来源参数
+    SOURCE_KEY_MAP = {
+        "BAIDU": "baidu",
+        "TOUTIAO": "toutiao",
+        "GOOGLE_TRENDS": "google_trends",
+        "GOOGLE": "google_trends",
+    }
+    source_list = [
+        SOURCE_KEY_MAP.get(s.strip().upper(), s.strip().lower())
+        for s in sources.split(",") if s.strip()
+    ]
+
     try:
         pipeline = HotspotPipeline()
-        result = pipeline.run(source=source)
+        result = pipeline.run(sources=source_list)
 
         # ── 控制台输出采集简报 ──
         logger.info(
-            f"📡 热点采集完成 | 来源: {source} | "
+            f"📡 热点采集完成 | 来源: {sources} | "
             f"采集 {result['news_collected']} 条 | "
             f"入库 {result['news_saved']} 条 | "
             f"发现 {result['hot_events']} 个热点"

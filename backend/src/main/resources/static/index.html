@@ -1,3036 +1,1528 @@
 <!doctype html>
 <html lang="zh-CN">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>SentiGuard - 事实核查</title>
-  <style>
-    :root {
-      --bg: #edf2f6;
-      --surface: #ffffff;
-      --surface-soft: #f7fafc;
-      --ink: #172331;
-      --muted: #647386;
-      --line: #d7e1ea;
-      --line-strong: #bfd0dd;
-      --nav: #243545;
-      --nav-dark: #192938;
-      --blue: #1f78b5;
-      --blue-dark: #145986;
-      --blue-soft: #e6f2fb;
-      --teal: #0f8177;
-      --teal-soft: #e0f5f2;
-      --green: #158147;
-      --green-soft: #ddf5e7;
-      --red: #c93a3a;
-      --red-soft: #fde8e8;
-      --amber: #a65f00;
-      --amber-soft: #fff0cc;
-      --shadow: 0 18px 38px rgba(21, 38, 55, 0.09);
-      --shadow-soft: 0 10px 22px rgba(21, 38, 55, 0.06);
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      margin: 0;
-      min-height: 100vh;
-      color: var(--ink);
-      background: var(--bg);
-      font-family: "Microsoft YaHei", Arial, sans-serif;
-    }
-
-    button,
-    input,
-    textarea {
-      font: inherit;
-    }
-
-    button {
-      border: 0;
-      cursor: pointer;
-    }
-
-    .app {
-      min-height: 100vh;
-      display: grid;
-      grid-template-columns: 260px minmax(0, 1fr);
-    }
-
-    .sidebar {
-      background: var(--nav);
-      color: #dbe7f0;
-      border-right: 1px solid #182635;
-    }
-
-    .brand {
-      height: 82px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 0 22px;
-      background: var(--nav-dark);
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    }
-
-    .brand-mark {
-      width: 38px;
-      height: 38px;
-      display: grid;
-      place-items: center;
-      border-radius: 7px;
-      color: #102a3b;
-      background: #f3c84b;
-      font-weight: 900;
-    }
-
-    .brand-name {
-      font-size: 18px;
-      font-weight: 900;
-      line-height: 1.1;
-    }
-
-    .brand-desc {
-      margin-top: 4px;
-      color: #9eb0bf;
-      font-size: 12px;
-    }
-
-    .nav-block {
-      padding: 18px 14px 8px;
-    }
-
-    .nav-title {
-      padding: 0 10px 9px;
-      color: #91a5b6;
-      font-size: 12px;
-      font-weight: 900;
-    }
-
-    .nav-item {
-      width: 100%;
-      min-height: 44px;
-      display: grid;
-      grid-template-columns: 24px 1fr auto;
-      align-items: center;
-      gap: 10px;
-      padding: 0 12px;
-      border-radius: 6px;
-      background: transparent;
-      color: #dbe7f0;
-      text-align: left;
-      font-weight: 900;
-    }
-
-    .nav-item + .nav-item {
-      margin-top: 5px;
-    }
-
-    .nav-item.active {
-      background: var(--blue);
-      color: #ffffff;
-    }
-
-    .nav-item.disabled {
-      color: #8fa3b4;
-      cursor: default;
-    }
-
-    .badge {
-      min-width: 42px;
-      height: 22px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0 8px;
-      border-radius: 999px;
-      color: #566a7d;
-      background: #e5edf4;
-      font-size: 12px;
-      font-weight: 900;
-      white-space: nowrap;
-    }
-
-    .badge.live {
-      color: #0a5b3b;
-      background: #cfeedd;
-    }
-
-    .main {
-      min-width: 0;
-      display: grid;
-      grid-template-rows: 66px minmax(0, 1fr);
-    }
-
-    .topbar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 18px;
-      padding: 0 28px;
-      background: #ffffff;
-      border-bottom: 1px solid var(--line);
-    }
-
-    .crumb {
-      color: var(--muted);
-      font-size: 13px;
-      font-weight: 900;
-    }
-
-    .system-state {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .pill {
-      height: 32px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      padding: 0 12px;
-      border-radius: 999px;
-      color: var(--green);
-      background: var(--green-soft);
-      font-size: 13px;
-      font-weight: 900;
-      white-space: nowrap;
-    }
-
-    .pill.error {
-      color: var(--red);
-      background: var(--red-soft);
-    }
-
-    .content {
-      min-width: 0;
-      padding: 24px 28px 36px;
-      overflow: auto;
-    }
-
-    .hero {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: 18px;
-      align-items: end;
-      margin-bottom: 18px;
-    }
-
-    .eyebrow {
-      margin-bottom: 8px;
-      color: var(--blue-dark);
-      font-size: 13px;
-      font-weight: 900;
-    }
-
-    h1 {
-      margin: 0;
-      font-size: 31px;
-      letter-spacing: 0;
-    }
-
-    .hero-desc {
-      max-width: 850px;
-      margin-top: 9px;
-      color: var(--muted);
-      line-height: 1.7;
-      font-size: 14px;
-    }
-
-    .hero-actions {
-      display: flex;
-      gap: 10px;
-    }
-
-    .btn {
-      height: 40px;
-      min-width: 104px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 7px;
-      padding: 0 15px;
-      border-radius: 6px;
-      color: #ffffff;
-      background: var(--blue);
-      font-weight: 900;
-    }
-
-    .btn.secondary {
-      color: #24475f;
-      background: #dfeaf2;
-    }
-
-    .btn.ghost {
-      color: #24475f;
-      background: #ffffff;
-      border: 1px solid var(--line);
-    }
-
-    .btn:disabled {
-      opacity: 0.66;
-      cursor: wait;
-    }
-
-    .overview {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 12px;
-      margin-bottom: 16px;
-    }
-
-    .metric,
-    .panel,
-    .notice {
-      background: var(--surface);
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      box-shadow: var(--shadow-soft);
-    }
-
-    .metric {
-      min-height: 92px;
-      padding: 15px 17px;
-    }
-
-    .metric-label {
-      color: var(--muted);
-      font-size: 13px;
-      font-weight: 900;
-    }
-
-    .metric-value {
-      margin-top: 7px;
-      color: #14344d;
-      font-size: 25px;
-      font-weight: 900;
-    }
-
-    .metric-note {
-      margin-top: 4px;
-      color: var(--muted);
-      font-size: 12px;
-    }
-
-    .workspace {
-      display: grid;
-      grid-template-columns: minmax(370px, 0.86fr) minmax(0, 1.14fr);
-      gap: 16px;
-      align-items: start;
-    }
-
-    .stack {
-      display: grid;
-      gap: 16px;
-    }
-
-    .panel {
-      box-shadow: var(--shadow);
-    }
-
-    .panel-head {
-      min-height: 58px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      padding: 16px 18px 12px;
-      border-bottom: 1px solid var(--line);
-    }
-
-    .panel-title {
-      color: var(--blue-dark);
-      font-size: 17px;
-      font-weight: 900;
-    }
-
-    .panel-sub {
-      color: var(--muted);
-      font-size: 12px;
-      font-weight: 900;
-    }
-
-    .panel-body {
-      padding: 18px;
-    }
-
-    .form {
-      display: grid;
-      gap: 14px;
-    }
-
-    .field {
-      display: grid;
-      gap: 7px;
-    }
-
-    label {
-      color: #3f5367;
-      font-size: 13px;
-      font-weight: 900;
-    }
-
-    textarea,
-    input {
-      width: 100%;
-      border: 1px solid #ccd8e4;
-      border-radius: 6px;
-      color: var(--ink);
-      background: #ffffff;
-      outline: none;
-    }
-
-    textarea {
-      min-height: 214px;
-      padding: 13px 14px;
-      resize: vertical;
-      line-height: 1.75;
-    }
-
-    input {
-      height: 40px;
-      padding: 0 12px;
-    }
-
-    textarea:focus,
-    input:focus {
-      border-color: var(--blue);
-      box-shadow: 0 0 0 3px rgba(31, 120, 181, 0.12);
-    }
-
-    .form-row {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) 126px;
-      gap: 10px;
-      align-items: end;
-    }
-
-    .source-switch {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 8px;
-    }
-
-    .source-card {
-      min-height: 58px;
-      padding: 9px 10px;
-      border: 1px solid #d6e1ea;
-      border-radius: 7px;
-      background: var(--surface-soft);
-      color: #30495e;
-      text-align: left;
-    }
-
-    .source-card.active {
-      border-color: var(--blue);
-      background: var(--blue-soft);
-    }
-
-    .source-card strong {
-      display: block;
-      font-size: 13px;
-      line-height: 1.4;
-    }
-
-    .source-card span {
-      display: block;
-      margin-top: 3px;
-      color: var(--muted);
-      font-size: 12px;
-    }
-
-    .notice {
-      padding: 14px 15px;
-      color: #4c6275;
-      background: #f8fbfd;
-      line-height: 1.75;
-      font-size: 13px;
-    }
-
-    .link-grid {
-      display: grid;
-      gap: 10px;
-    }
-
-    .link-row {
-      display: grid;
-      grid-template-columns: 34px 1fr;
-      gap: 11px;
-      align-items: start;
-      padding: 12px;
-      border: 1px solid #e0e8ef;
-      border-radius: 7px;
-      background: #f8fbfd;
-    }
-
-    .link-icon {
-      width: 30px;
-      height: 30px;
-      display: grid;
-      place-items: center;
-      border-radius: 50%;
-      color: #ffffff;
-      background: var(--teal);
-      font-weight: 900;
-    }
-
-    .link-title {
-      font-weight: 900;
-      line-height: 1.5;
-    }
-
-    .link-desc {
-      margin-top: 3px;
-      color: var(--muted);
-      font-size: 12px;
-      line-height: 1.6;
-    }
-
-    .empty {
-      min-height: 220px;
-      display: grid;
-      place-items: center;
-      padding: 22px;
-      border: 1px dashed #c4d3df;
-      border-radius: 8px;
-      color: var(--muted);
-      background: #f8fbfd;
-      text-align: center;
-      line-height: 1.8;
-    }
-
-    .result-hero {
-      border: 1px solid #dce7ef;
-      border-radius: 8px;
-      background: #f8fbfd;
-      overflow: hidden;
-    }
-
-    .result-band {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: 14px;
-      align-items: center;
-      padding: 17px 18px;
-      background: #ffffff;
-      border-bottom: 1px solid #dce7ef;
-    }
-
-    .tag {
-      min-width: 74px;
-      height: 31px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0 11px;
-      border-radius: 5px;
-      font-size: 13px;
-      font-weight: 900;
-      white-space: nowrap;
-    }
-
-    .tag.true,
-    .tag.support,
-    .tag.supported,
-    .tag.success {
-      color: var(--green);
-      background: var(--green-soft);
-    }
-
-    .tag.false,
-    .tag.attack,
-    .tag.not_supported,
-    .tag.failed {
-      color: var(--red);
-      background: var(--red-soft);
-    }
-
-    .tag.partly_true,
-    .tag.partly_supported,
-    .tag.insufficient_evidence,
-    .tag.neutral,
-    .tag.running,
-    .tag.pending {
-      color: var(--amber);
-      background: var(--amber-soft);
-    }
-
-    .conclusion {
-      font-size: 22px;
-      line-height: 1.55;
-      font-weight: 900;
-    }
-
-    .analysis {
-      padding: 16px 18px 18px;
-      color: #35495d;
-      line-height: 1.85;
-      font-size: 14px;
-    }
-
-    .section-title {
-      margin: 18px 0 10px;
-      color: #18354d;
-      font-size: 15px;
-      font-weight: 900;
-    }
-
-    .list {
-      display: grid;
-      gap: 10px;
-    }
-
-    .claim,
-    .evidence {
-      border: 1px solid #dfe8ef;
-      border-left: 4px solid var(--blue);
-      border-radius: 7px;
-      background: #f8fbfd;
-      padding: 13px 14px;
-    }
-
-    .claim {
-      display: grid;
-      grid-template-columns: 32px 1fr auto;
-      gap: 12px;
-      align-items: start;
-    }
-
-    .claim-no {
-      width: 28px;
-      height: 28px;
-      display: grid;
-      place-items: center;
-      border-radius: 50%;
-      color: #ffffff;
-      background: var(--blue);
-      font-size: 13px;
-      font-weight: 900;
-    }
-
-    .claim-text,
-    .evidence-title {
-      font-weight: 900;
-      line-height: 1.6;
-    }
-
-    .muted {
-      color: var(--muted);
-      font-size: 13px;
-    }
-
-    .evidence-head {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: 10px;
-      align-items: center;
-      margin-bottom: 7px;
-    }
-
-    .evidence-content,
-    .report-content {
-      color: #35495d;
-      line-height: 1.85;
-      font-size: 14px;
-    }
-
-    .evidence-meta {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      margin-top: 10px;
-      color: var(--muted);
-      font-size: 12px;
-    }
-
-    .evidence-meta a {
-      color: var(--blue-dark);
-      text-decoration: none;
-      font-weight: 900;
-    }
-
-    .report-content {
-      white-space: pre-wrap;
-      padding: 16px;
-      border: 1px solid #dce7ef;
-      border-radius: 8px;
-      background: #f8fbfd;
-    }
-
-    .toast {
-      position: fixed;
-      right: 24px;
-      bottom: 24px;
-      max-width: 420px;
-      min-width: 260px;
-      padding: 13px 15px;
-      border-radius: 8px;
-      color: #ffffff;
-      background: #1f2937;
-      box-shadow: var(--shadow);
-      opacity: 0;
-      pointer-events: none;
-      transform: translateY(10px);
-      transition: 0.2s ease;
-      z-index: 30;
-    }
-
-    .toast.show {
-      opacity: 1;
-      transform: translateY(0);
-    }
-
-    .toast.error {
-      background: var(--red);
-    }
-
-    /* Visual polish for the fact-checking workspace */
-    body {
-      background:
-        linear-gradient(180deg, #f5f8fb 0%, #eef4f7 48%, #f7f9fb 100%),
-        repeating-linear-gradient(90deg, rgba(28, 63, 84, 0.035) 0 1px, transparent 1px 36px);
-    }
-
-    .sidebar {
-      background: linear-gradient(180deg, #183044 0%, #203847 52%, #162836 100%);
-      box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.05);
-    }
-
-    .brand {
-      height: 88px;
-      background: rgba(10, 24, 36, 0.42);
-      backdrop-filter: blur(10px);
-    }
-
-    .brand-mark {
-      color: #163044;
-      background: linear-gradient(135deg, #ffe083 0%, #7bd8c5 100%);
-      box-shadow: 0 10px 26px rgba(2, 18, 32, 0.26);
-    }
-
-    .brand-name {
-      letter-spacing: 0;
-    }
-
-    .nav-title {
-      letter-spacing: 0;
-      text-transform: none;
-    }
-
-    .nav-item {
-      position: relative;
-      overflow: hidden;
-      border: 1px solid transparent;
-      transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
-    }
-
-    .nav-item:hover {
-      background: rgba(255, 255, 255, 0.08);
-      border-color: rgba(255, 255, 255, 0.08);
-      transform: translateX(2px);
-    }
-
-    .nav-item.active {
-      background: linear-gradient(135deg, #1f78b5 0%, #16a085 100%);
-      box-shadow: 0 12px 28px rgba(5, 18, 30, 0.22);
-    }
-
-    .topbar {
-      position: sticky;
-      top: 0;
-      z-index: 20;
-      background: rgba(255, 255, 255, 0.86);
-      backdrop-filter: blur(14px);
-      box-shadow: 0 1px 0 rgba(130, 150, 165, 0.14);
-    }
-
-    .crumb {
-      color: #52677a;
-    }
-
-    .content {
-      padding: 28px 32px 40px;
-    }
-
-    .hero {
-      align-items: center;
-      margin-bottom: 22px;
-      padding-bottom: 4px;
-    }
-
-    .eyebrow {
-      display: inline-flex;
-      align-items: center;
-      min-height: 24px;
-      margin-bottom: 10px;
-      padding: 0 9px;
-      border: 1px solid rgba(31, 120, 181, 0.18);
-      border-radius: 6px;
-      color: #0f6b82;
-      background: rgba(230, 242, 251, 0.72);
-    }
-
-    h1 {
-      color: #112d42;
-      font-size: 30px;
-    }
-
-    .hero-desc {
-      max-width: 780px;
-      color: #586b7b;
-    }
-
-    .btn {
-      border: 1px solid transparent;
-      background: linear-gradient(135deg, #1f78b5 0%, #0f8177 100%);
-      box-shadow: 0 10px 22px rgba(31, 120, 181, 0.16);
-      transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
-    }
-
-    .btn:hover:not(:disabled) {
-      transform: translateY(-1px);
-      box-shadow: 0 14px 28px rgba(31, 120, 181, 0.2);
-    }
-
-    .btn.ghost {
-      color: #1f4d66;
-      background: rgba(255, 255, 255, 0.82);
-      border-color: #cfdae4;
-      box-shadow: 0 8px 18px rgba(21, 38, 55, 0.06);
-    }
-
-    .btn.ghost:hover:not(:disabled) {
-      background: #ffffff;
-      border-color: #aebfce;
-    }
-
-    .pill {
-      border: 1px solid rgba(21, 129, 71, 0.12);
-      background: #e7f7ed;
-    }
-
-    .overview {
-      gap: 14px;
-      margin-bottom: 18px;
-    }
-
-    .metric,
-    .panel,
-    .notice {
-      border-color: rgba(190, 205, 218, 0.84);
-      background: rgba(255, 255, 255, 0.92);
-      box-shadow: 0 18px 40px rgba(28, 50, 66, 0.08);
-    }
-
-    .metric {
-      position: relative;
-      min-height: 108px;
-      padding: 17px 18px 16px;
-      overflow: hidden;
-    }
-
-    .metric::before {
-      content: "";
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 3px;
-      background: linear-gradient(90deg, #1f78b5, #0f8177, #e0a72f);
-    }
-
-    .metric-label {
-      color: #5f7181;
-    }
-
-    .metric-value {
-      color: #102f46;
-      font-size: 27px;
-      line-height: 1.15;
-    }
-
-    .metric-note {
-      color: #718394;
-    }
-
-    .workspace {
-      gap: 18px;
-    }
-
-    .stack {
-      gap: 18px;
-    }
-
-    .panel {
-      overflow: hidden;
-    }
-
-    .panel-head {
-      padding: 17px 19px 14px;
-      background:
-        linear-gradient(180deg, rgba(248, 252, 255, 0.94) 0%, rgba(255, 255, 255, 0.9) 100%);
-    }
-
-    .panel-title {
-      color: #12364f;
-      font-size: 16px;
-    }
-
-    .panel-sub {
-      margin-top: 4px;
-      color: #6b7d8d;
-    }
-
-    .panel-body {
-      padding: 19px;
-    }
-
-    label {
-      color: #2f4f64;
-    }
-
-    textarea,
-    input {
-      border-color: #c9d7e3;
-      background: #fbfdff;
-      transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
-    }
-
-    textarea:hover,
-    input:hover {
-      background: #ffffff;
-      border-color: #b6c9d8;
-    }
-
-    textarea {
-      min-height: 238px;
-      line-height: 1.8;
-    }
-
-    .form-row {
-      grid-template-columns: minmax(0, 1fr) 136px;
-    }
-
-    .notice {
-      position: relative;
-      padding: 15px 16px 15px 18px;
-      border-left: 4px solid #0f8177;
-      color: #425b6e;
-      background: linear-gradient(180deg, #fbfefd 0%, #f4faf8 100%);
-    }
-
-    .empty {
-      min-height: 230px;
-      border-color: #bfd2df;
-      background:
-        linear-gradient(180deg, rgba(251, 253, 255, 0.9), rgba(244, 249, 252, 0.96));
-      color: #6b7d8d;
-    }
-
-    .result-hero,
-    .report-content {
-      border-color: #cfdde8;
-      background: #fbfdff;
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
-    }
-
-    .result-band {
-      background: linear-gradient(90deg, #ffffff 0%, #f3faf8 100%);
-    }
-
-    .tag {
-      border: 1px solid transparent;
-    }
-
-    .tag.true,
-    .tag.support,
-    .tag.supported,
-    .tag.success {
-      border-color: rgba(21, 129, 71, 0.14);
-    }
-
-    .tag.false,
-    .tag.attack,
-    .tag.not_supported,
-    .tag.failed {
-      border-color: rgba(201, 58, 58, 0.14);
-    }
-
-    .tag.partly_true,
-    .tag.partly_supported,
-    .tag.insufficient_evidence,
-    .tag.neutral,
-    .tag.running,
-    .tag.pending {
-      border-color: rgba(166, 95, 0, 0.14);
-    }
-
-    .conclusion {
-      color: #12364f;
-      font-size: 21px;
-    }
-
-    .analysis {
-      color: #344f63;
-    }
-
-    .section-title {
-      position: relative;
-      padding-left: 11px;
-      color: #173c55;
-    }
-
-    .section-title::before {
-      content: "";
-      position: absolute;
-      left: 0;
-      top: 5px;
-      bottom: 5px;
-      width: 3px;
-      border-radius: 999px;
-      background: #0f8177;
-    }
-
-    .claim,
-    .evidence {
-      background: #fbfdff;
-      border-color: #d7e4ec;
-      box-shadow: 0 8px 18px rgba(28, 50, 66, 0.04);
-    }
-
-    .claim-no {
-      background: linear-gradient(135deg, #1f78b5, #0f8177);
-      box-shadow: 0 8px 16px rgba(31, 120, 181, 0.16);
-    }
-
-    .evidence {
-      border-left-color: #0f8177;
-    }
-
-    .evidence-meta {
-      padding-top: 10px;
-      border-top: 1px solid #edf2f5;
-    }
-
-    .toast {
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      background: #182838;
-    }
-
-    .compact-hidden {
-      display: none;
-    }
-
-    .compact-workspace {
-      grid-template-columns: minmax(340px, 0.76fr) minmax(0, 1.24fr);
-      max-width: 1160px;
-    }
-
-    .input-panel,
-    .output-panel {
-      min-height: 0;
-    }
-
-    .input-panel textarea {
-      min-height: 260px;
-    }
-
-    .compact-form-row {
-      grid-template-columns: minmax(0, 1fr) 132px;
-    }
-
-    .compact-output {
-      display: grid;
-      gap: 14px;
-    }
-
-    .compact-empty {
-      min-height: 196px;
-    }
-
-    .secondary-output {
-      min-height: 156px;
-    }
-
-    #reportView {
-      display: none;
-    }
-
-    .result-hero.compact-result {
-      border-radius: 8px;
-    }
-
-    .result-hero.compact-result .result-band {
-      padding: 15px 16px;
-    }
-
-    .result-hero.compact-result .analysis {
-      padding: 14px 16px 16px;
-    }
-
-    .result-hero.compact-result .conclusion {
-      margin-bottom: 8px;
-    }
-
-    .compact-evidence {
-      display: grid;
-      gap: 10px;
-    }
-
-    .compact-evidence-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      color: #173c55;
-      font-weight: 900;
-    }
-
-    .compact-count {
-      color: var(--muted);
-      font-size: 12px;
-      font-weight: 900;
-    }
-
-    /* Customer-facing refinement */
-    body {
-      background: #f5f7fa;
-    }
-
-    .sidebar {
-      background: #10283a;
-    }
-
-    .brand {
-      height: 80px;
-      background: #0d2232;
-    }
-
-    .brand-mark {
-      border-radius: 8px;
-      background: #d9f4df;
-      box-shadow: none;
-    }
-
-    .nav-item {
-      border-radius: 8px;
-      transform: none;
-    }
-
-    .nav-item:hover {
-      transform: none;
-    }
-
-    .nav-item.active {
-      background: #187c86;
-      box-shadow: none;
-    }
-
-    .badge {
-      height: 24px;
-      border-radius: 999px;
-    }
-
-    .topbar {
-      height: 64px;
-      background: #ffffff;
-      backdrop-filter: none;
-    }
-
-    #backendStatus,
-    #dbStatus {
-      display: none;
-    }
-
-    .system-state {
-      gap: 12px;
-    }
-
-    .pill {
-      height: 34px;
-      border-radius: 999px;
-      color: #0f6f52;
-      background: #edf8f2;
-    }
-
-    .content {
-      max-width: 1220px;
-      padding: 30px 32px 44px;
-    }
-
-    .hero {
-      max-width: 1160px;
-      margin-bottom: 24px;
-    }
-
-    .eyebrow {
-      padding: 0;
-      border: 0;
-      color: #187c86;
-      background: transparent;
-      font-size: 13px;
-    }
-
-    h1 {
-      font-size: 32px;
-      line-height: 1.2;
-    }
-
-    .hero-desc {
-      max-width: 520px;
-      margin-top: 10px;
-      color: #5e7080;
-      font-size: 14px;
-    }
-
-    .compact-workspace {
-      grid-template-columns: minmax(360px, 0.72fr) minmax(0, 1.28fr);
-      max-width: 1160px;
-      gap: 20px;
-    }
-
-    .panel {
-      border-radius: 10px;
-      border-color: #d8e2ea;
-      background: #ffffff;
-      box-shadow: 0 18px 44px rgba(18, 42, 58, 0.08);
-    }
-
-    .panel-head {
-      min-height: 64px;
-      padding: 18px 20px 14px;
-      background: #ffffff;
-    }
-
-    .panel-title {
-      color: #0f2f45;
-      font-size: 18px;
-    }
-
-    .panel-sub {
-      color: #728293;
-      font-size: 13px;
-    }
-
-    .panel-body {
-      padding: 20px;
-    }
-
-    .input-panel textarea {
-      min-height: 300px;
-      border-radius: 8px;
-      background: #ffffff;
-      font-size: 15px;
-    }
-
-    .hot-event-field {
-      display: none;
-    }
-
-    .compact-form-row {
-      display: block;
-    }
-
-    .compact-form-row .btn {
-      width: 100%;
-      height: 46px;
-      margin-top: 2px;
-      font-size: 15px;
-    }
-
-    .btn {
-      border-radius: 8px;
-      background: #187c86;
-      box-shadow: none;
-    }
-
-    .btn:hover:not(:disabled) {
-      background: #126973;
-      box-shadow: none;
-    }
-
-    .btn.ghost {
-      color: #23485f;
-      background: #ffffff;
-      border-color: #ccd9e3;
-      box-shadow: none;
-    }
-
-    .compact-output {
-      gap: 16px;
-    }
-
-    .compact-empty,
-    .secondary-output {
-      min-height: 210px;
-      border-radius: 10px;
-      border-color: #cfdae4;
-      background: #fbfcfd;
-      color: #7b8996;
-      font-size: 15px;
-    }
-
-    .secondary-output {
-      min-height: 150px;
-    }
-
-    .result-hero.compact-result {
-      border-color: #d8e2ea;
-      background: #ffffff;
-      box-shadow: none;
-    }
-
-    .result-hero.compact-result .result-band {
-      padding: 16px 18px;
-      background: #ffffff;
-    }
-
-    .result-hero.compact-result .analysis {
-      padding: 18px;
-    }
-
-    .conclusion {
-      color: #0f2f45;
-      font-size: 24px;
-      line-height: 1.45;
-    }
-
-    .tag {
-      min-width: 76px;
-      height: 32px;
-      border-radius: 999px;
-    }
-
-    .compact-evidence-head {
-      padding: 2px 0;
-      font-size: 16px;
-    }
-
-    .evidence {
-      border-left-width: 3px;
-      border-radius: 10px;
-      background: #ffffff;
-      box-shadow: none;
-    }
-
-    .evidence-title {
-      color: #0f2f45;
-      font-size: 15px;
-    }
-
-    .evidence-content {
-      color: #3b5163;
-    }
-
-    /* Government-grade vertical workflow */
-    .content {
-      width: 100%;
-      max-width: 1320px;
-      margin: 0 auto;
-      padding: 34px 40px 54px;
-    }
-
-    .hero {
-      max-width: none;
-      margin-bottom: 26px;
-      padding: 0 2px 2px;
-    }
-
-    .eyebrow {
-      color: #0f6f76;
-      font-weight: 900;
-    }
-
-    h1 {
-      color: #082d45;
-      font-size: 34px;
-    }
-
-    .hero-desc {
-      max-width: 760px;
-      color: #52687a;
-      line-height: 1.75;
-    }
-
-    .compact-workspace {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 22px;
-      max-width: none;
-    }
-
-    .panel {
-      border-radius: 8px;
-      border-color: #ccd9e3;
-      box-shadow: 0 20px 46px rgba(18, 42, 58, 0.07);
-    }
-
-    .panel-head {
-      min-height: 68px;
-      padding: 19px 24px 15px;
-      background: linear-gradient(180deg, #ffffff 0%, #f8fbfd 100%);
-    }
-
-    .panel-title {
-      font-size: 19px;
-    }
-
-    .panel-body {
-      padding: 24px;
-    }
-
-    .input-panel {
-      position: relative;
-      overflow: hidden;
-    }
-
-    .input-panel::before,
-    .output-panel::before {
-      content: "";
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 3px;
-      background: linear-gradient(90deg, #0f5f78, #187c86, #b99648);
-    }
-
-    .input-panel .form {
-      gap: 16px;
-    }
-
-    .input-panel textarea {
-      min-height: 142px;
-      border-radius: 8px;
-      background: #fbfdff;
-      font-size: 15px;
-      line-height: 1.8;
-    }
-
-    .input-panel textarea:focus,
-    .input-panel input:focus {
-      border-color: #187c86;
-      box-shadow: 0 0 0 3px rgba(24, 124, 134, 0.12);
-    }
-
-    .hot-event-field {
-      display: none;
-    }
-
-    .compact-form-row {
-      display: grid;
-      grid-template-columns: minmax(220px, 320px) minmax(0, 1fr) auto auto auto;
-      justify-content: end;
-      gap: 12px;
-      align-items: end;
-    }
-
-    .input-panel.show-advanced .hot-event-field {
-      display: grid;
-      max-width: 320px;
-    }
-
-    .advanced-toggle {
-      grid-column: 1;
-      justify-self: start;
-      min-width: 92px;
-    }
-
-    #resetBtn {
-      grid-column: 4;
-    }
-
-    #analyzeBtn {
-      grid-column: 5;
-    }
-
-    .compact-form-row .btn {
-      width: auto;
-      min-width: 104px;
-      height: 42px;
-      margin-top: 0;
-    }
-
-    .input-panel.show-advanced .advanced-toggle {
-      grid-column: 2;
-    }
-
-    .output-panel {
-      position: relative;
-      min-height: 0;
-    }
-
-    .compact-output {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr);
-      gap: 18px;
-    }
-
-    .compact-empty,
-    .secondary-output {
-      min-height: 170px;
-      border-radius: 8px;
-      background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(247, 250, 252, 0.96));
-    }
-
-    .secondary-output {
-      min-height: 210px;
-    }
-
-    #reportView {
-      display: block;
-      min-height: 180px;
-    }
-
-    .result-hero.compact-result {
-      border-radius: 8px;
-      border-color: #cbd9e3;
-    }
-
-    .result-hero.compact-result .result-band {
-      padding: 18px 20px;
-      background: #f9fcfd;
-    }
-
-    .result-hero.compact-result .analysis {
-      padding: 22px 22px 24px;
-    }
-
-    .conclusion {
-      font-size: 26px;
-      margin-bottom: 10px;
-    }
-
-    .compact-evidence {
-      gap: 12px;
-      padding: 2px 0 0;
-    }
-
-    .compact-evidence-head {
-      padding: 0;
-      font-size: 17px;
-    }
-
-    .compact-count {
-      color: #66798a;
-      font-size: 13px;
-    }
-
-    .evidence {
-      padding: 16px 18px;
-      border-radius: 8px;
-      border-left-color: #187c86;
-      background: #fbfdff;
-    }
-
-    .evidence + .evidence {
-      margin-top: 2px;
-    }
-
-    .evidence-title {
-      font-size: 16px;
-    }
-
-    .report-content {
-      display: block;
-      min-height: 180px;
-      padding: 18px 20px;
-      border-radius: 8px;
-      border-color: #d4e0e8;
-      background: #fbfdff;
-    }
-
-    /* Final product polish: compact input, result-first hierarchy */
-    .content {
-      max-width: 1180px;
-      padding-top: 28px;
-    }
-
-    .hero {
-      margin-bottom: 20px;
-    }
-
-    h1 {
-      font-size: 32px;
-    }
-
-    .hero-desc {
-      max-width: 680px;
-    }
-
-    .compact-workspace {
-      gap: 18px;
-    }
-
-    .panel {
-      border-color: #d3dee7;
-      box-shadow: 0 16px 38px rgba(15, 38, 55, 0.065);
-    }
-
-    .panel-head {
-      min-height: 62px;
-      padding: 17px 22px 13px;
-    }
-
-    .panel-body {
-      padding: 20px 22px 22px;
-    }
-
-    .input-panel textarea {
-      min-height: 128px;
-    }
-
-    .input-panel.has-result textarea {
-      min-height: 96px;
-    }
-
-    .compact-form-row {
-      margin-top: 2px;
-    }
-
-    .compact-empty {
-      min-height: 132px;
-    }
-
-    .secondary-output {
-      min-height: 104px;
-    }
-
-    .result-hero.compact-result .result-band {
-      min-height: 58px;
-    }
-
-    .result-hero.compact-result .analysis {
-      padding: 20px 22px 22px;
-    }
-
-    .conclusion {
-      font-size: 24px;
-      letter-spacing: 0;
-    }
-
-    .result-summary {
-      gap: 10px;
-    }
-
-    .summary-item {
-      min-height: 72px;
-      background: linear-gradient(180deg, #ffffff 0%, #f9fbfd 100%);
-    }
-
-    .summary-value {
-      font-size: 18px;
-    }
-
-    .export-btn {
-      border-color: #c8d7e3;
-      background: #ffffff;
-    }
-
-
-    .output-actions {
-      display: flex;
-      align-items: center;
-      justify-content: flex-end;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-
-    .report-preview-modal {
-      position: fixed;
-      inset: 0;
-      z-index: 80;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      padding: 28px;
-      background: rgba(13, 34, 50, 0.54);
-    }
-
-    .report-preview-modal.show {
-      display: flex;
-    }
-
-    .report-preview-dialog {
-      width: min(1120px, 100%);
-      height: min(820px, calc(100vh - 56px));
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      border-radius: 10px;
-      background: #ffffff;
-      box-shadow: 0 28px 80px rgba(15, 38, 55, 0.24);
-    }
-
-    .report-preview-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-      padding: 16px 20px;
-      border-bottom: 1px solid #dbe5ee;
-    }
-
-    .report-preview-title {
-      margin: 0;
-      color: #0d2d43;
-      font-size: 18px;
-      font-weight: 900;
-    }
-
-    .report-preview-frame {
-      flex: 1;
-      width: 100%;
-      border: 0;
-      background: #ffffff;
-    }
-    .mode-switch {
-      display: inline-flex;
-      width: max-content;
-      padding: 4px;
-      border: 1px solid #ccd9e3;
-      border-radius: 10px;
-      background: #ffffff;
-      box-shadow: 0 10px 24px rgba(15, 38, 55, 0.05);
-    }
-
-    .mode-tab {
-      min-width: 112px;
-      height: 34px;
-      padding: 0 14px;
-      border-radius: 7px;
-      color: #355368;
-      background: transparent;
-      font-weight: 900;
-    }
-
-    .mode-tab.active {
-      color: #ffffff;
-      background: #187c86;
-    }
-
-
-    .check-mode-selector {
-      position: relative;
-      grid-column: 3;
-      justify-self: end;
-    }
-
-    .mode-select-trigger {
-      min-width: 128px;
-      height: 42px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      padding: 0 14px;
-      border: 1px solid #c8d7e3;
-      border-radius: 8px;
-      color: #15384f;
-      background: #ffffff;
-      font-weight: 900;
-      box-shadow: 0 8px 18px rgba(15, 38, 55, 0.06);
-    }
-
-    .mode-select-trigger:disabled {
-      opacity: 0.58;
-      cursor: not-allowed;
-    }
-
-    .mode-select-icon {
-      width: 18px;
-      display: inline-flex;
-      justify-content: center;
-      color: #0f7d86;
-      font-weight: 900;
-    }
-
-    .mode-select-caret {
-      color: #7a8b9c;
-      font-size: 13px;
-    }
-
-    .mode-select-menu {
-      position: absolute;
-      right: 0;
-      bottom: calc(100% + 10px);
-      z-index: 40;
-      width: 292px;
-      display: none;
-      padding: 8px;
-      border: 1px solid #dbe5ee;
-      border-radius: 10px;
-      background: #ffffff;
-      box-shadow: 0 20px 46px rgba(15, 38, 55, 0.18);
-    }
-
-    .check-mode-selector.open .mode-select-menu {
-      display: grid;
-      gap: 4px;
-    }
-
-    .mode-select-option {
-      width: 100%;
-      display: grid;
-      grid-template-columns: 24px minmax(0, 1fr) 20px;
-      align-items: center;
-      gap: 10px;
-      padding: 10px 9px;
-      border-radius: 8px;
-      color: #16364d;
-      background: transparent;
-      text-align: left;
-    }
-
-    .mode-select-option:hover,
-    .mode-select-option.active {
-      background: #f3f8fb;
-    }
-
-    .mode-select-option strong,
-    .mode-select-option small {
-      display: block;
-      line-height: 1.35;
-    }
-
-    .mode-select-option small {
-      margin-top: 3px;
-      color: #8a98a8;
-      font-weight: 700;
-    }
-
-    .mode-selected-mark {
-      visibility: hidden;
-      color: #0b1f2d;
-      font-weight: 900;
-    }
-
-    .mode-select-option.active .mode-selected-mark {
-      visibility: visible;
-    }
-    .mode-view {
-      display: none;
-      min-height: 0;
-    }
-
-    .mode-view.active {
-      display: block;
-    }
-
-    .dialog-panel {
-      position: relative;
-      overflow: hidden;
-    }
-
-    .dialog-panel::before {
-      content: "";
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 3px;
-      background: linear-gradient(90deg, #0f5f78, #187c86, #b99648);
-    }
-
-    .dialog-body {
-      display: grid;
-      grid-template-columns: minmax(0, 0.84fr) minmax(320px, 0.42fr);
-      gap: 16px;
-    }
-
-    .chat-shell {
-      min-height: 260px;
-      display: grid;
-      grid-template-rows: minmax(0, 1fr) auto;
-      border: 1px solid #d4e0e8;
-      border-radius: 8px;
-      background: #fbfdff;
-      overflow: hidden;
-    }
-
-    .chat-feed {
-      padding: 16px;
-    }
-
-    .chat-bubble {
-      max-width: 78%;
-      padding: 12px 14px;
-      border-radius: 8px;
-      color: #18394f;
-      background: #eef6f7;
-      line-height: 1.7;
-      font-size: 14px;
-    }
-
-    .chat-compose {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: 10px;
-      padding: 12px;
-      border-top: 1px solid #dce7ef;
-      background: #ffffff;
-    }
-
-    .chat-compose input {
-      height: 40px;
-    }
-
-    .guide-card {
-      padding: 16px;
-      border: 1px solid #d4e0e8;
-      border-radius: 8px;
-      background: linear-gradient(180deg, #ffffff 0%, #f9fbfd 100%);
-    }
-
-    .guide-title {
-      color: #0d354b;
-      font-size: 17px;
-      font-weight: 900;
-    }
-
-    .guide-list {
-      margin: 12px 0 0;
-      padding: 0;
-      list-style: none;
-      display: grid;
-      gap: 10px;
-      color: #52687a;
-      line-height: 1.65;
-      font-size: 14px;
-    }
-
-    .guide-list li {
-      padding-left: 14px;
-      border-left: 3px solid #187c86;
-    }
-
-    /* Desktop one-screen workflow */
-    @media (min-width: 821px) {
-      .main {
-        grid-template-rows: 56px minmax(0, 1fr);
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SentiGuard - 事实核查</title>
+    <style>
+      :root {
+        --bg: #f0f2f5;
+        --surface: #ffffff;
+        --surface-soft: #f7fafc;
+        --ink: #1a1a2e;
+        --muted: #8b92a8;
+        --line: #e2e6ef;
+        --line-strong: #bfd0dd;
+        --nav: #1a1d2e;
+        --nav-dark: rgba(0, 0, 0, 0.2);
+        --accent: #4361ee;
+        --accent-gradient: linear-gradient(135deg, #4361ee, #3a0ca3);
+        --blue: var(--accent);
+        --blue-dark: #145986;
+        --blue-soft: #dff0fc;
+        --teal: #16878d;
+        --teal-soft: #e0f5f2;
+        --green: #2d6a4f;
+        --green-soft: #d8f3dc;
+        --red: #9b2226;
+        --red-soft: #f8d7da;
+        --amber: #e8590c;
+        --amber-soft: #fff4e6;
+        --shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+        --shadow-soft: 0 1px 3px rgba(0, 0, 0, 0.04);
+        --radius: 10px;
+        --radius-lg: 14px;
+        --hero-gradient: linear-gradient(
+          135deg,
+          #16878d 0%,
+          #0d7377 50%,
+          #1a1d2e 100%
+        );
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0a0a14;
+          --surface: #141420;
+          --surface-soft: #1a1a2e;
+          --ink: #e4e6f0;
+          --muted: #6b7280;
+          --line: #2a2a3e;
+          --line-strong: #3a3a50;
+          --nav: #0d0d1a;
+          --nav-dark: #0a0a16;
+          --accent: #6c8cff;
+          --accent-gradient: linear-gradient(135deg, #6c8cff, #7c3aed);
+          --blue: var(--accent);
+          --blue-dark: #93bbfc;
+          --blue-soft: #1e3a5f;
+          --teal: #2dd4bf;
+          --teal-soft: #134e4a;
+          --green: #52b788;
+          --green-soft: #1b3a2a;
+          --red: #ef4444;
+          --red-soft: #3b1a1a;
+          --amber: #ff922b;
+          --amber-soft: #2d1f0a;
+          --shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+          --shadow-soft: 0 1px 3px rgba(0, 0, 0, 0.15);
+          --hero-gradient: linear-gradient(
+            135deg,
+            #134e4a 0%,
+            #0f172a 50%,
+            #0a0a14 100%
+          );
+        }
       }
 
-      .topbar {
-        height: 56px;
+      * {
+        box-sizing: border-box;
       }
 
-      .content {
-        height: calc(100vh - 56px);
-        overflow: hidden;
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--ink);
+        background: var(--bg);
+        font-family: "Microsoft YaHei", Arial, sans-serif;
+      }
+
+      button,
+      input,
+      textarea {
+        font: inherit;
+      }
+      button {
+        border: 0;
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .app {
+        min-height: 100vh;
         display: grid;
-        grid-template-rows: auto auto minmax(0, 1fr);
-        align-content: start;
+        grid-template-columns: 260px minmax(0, 1fr);
+      }
+
+      .sidebar {
+        background: var(--nav);
+        color: #dbe7f0;
+        border-right: 1px solid #182635;
+      }
+
+      .brand {
+        height: 82px;
+        display: flex;
+        align-items: center;
         gap: 12px;
-        max-width: 1160px;
-        padding: 24px 34px 28px;
+        padding: 0 22px;
+        background: var(--nav-dark);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        flex-shrink: 0;
       }
 
-      .hero {
-        margin-bottom: 0;
-        align-items: start;
-      }
-
-      h1 {
-        font-size: 30px;
-      }
-
-      .hero-desc {
-        margin-top: 6px;
-        line-height: 1.55;
-      }
-
-      .compact-workspace {
-        min-height: 0;
-        gap: 14px;
-        grid-template-rows: auto minmax(0, 1fr);
-      }
-
-  
-    .output-actions {
-      display: flex;
-      align-items: center;
-      justify-content: flex-end;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-
-    .report-preview-modal {
-      position: fixed;
-      inset: 0;
-      z-index: 80;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      padding: 28px;
-      background: rgba(13, 34, 50, 0.54);
-    }
-
-    .report-preview-modal.show {
-      display: flex;
-    }
-
-    .report-preview-dialog {
-      width: min(1120px, 100%);
-      height: min(820px, calc(100vh - 56px));
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      border-radius: 10px;
-      background: #ffffff;
-      box-shadow: 0 28px 80px rgba(15, 38, 55, 0.24);
-    }
-
-    .report-preview-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-      padding: 16px 20px;
-      border-bottom: 1px solid #dbe5ee;
-    }
-
-    .report-preview-title {
-      margin: 0;
-      color: #0d2d43;
-      font-size: 18px;
-      font-weight: 900;
-    }
-
-    .report-preview-frame {
-      flex: 1;
-      width: 100%;
-      border: 0;
-      background: #ffffff;
-    }
-    .mode-switch {
-        height: 42px;
-      }
-
-      .dialog-panel,
-      .dialog-panel .panel-body,
-      .dialog-body {
-        min-height: 0;
-      }
-
-      .chat-shell {
-        min-height: 300px;
-      }
-
-      .panel-head {
-        min-height: 52px;
-        padding: 14px 18px 11px;
-      }
-
-      .panel-title {
+      .brand-mark {
+        width: 40px;
+        height: 40px;
+        display: grid;
+        place-items: center;
+        border-radius: 10px;
+        color: #102a3b;
+        background: linear-gradient(135deg, #f3c84b, #f59e0b);
+        font-weight: 900;
         font-size: 18px;
       }
 
-      .panel-sub {
+      .brand-name {
+        font-size: 18px;
+        font-weight: 900;
+        color: #f0f4ff;
+      }
+      .brand-desc {
         margin-top: 2px;
+        color: #8899b4;
+        font-size: 11px;
+      }
+      .nav-block {
+        padding: 18px 14px;
+        flex: 1;
+      }
+      .nav-title {
+        padding: 0 10px 10px;
+        color: #6b7d95;
+        font-size: 11px;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .nav-item {
+        width: 100%;
+        min-height: 44px;
+        display: grid;
+        grid-template-columns: 24px 1fr auto;
+        align-items: center;
+        gap: 8px;
+        padding: 0 12px;
+        border-radius: 8px;
+        background: transparent;
+        color: #c8d2e0;
+        text-align: left;
+        font-weight: 600;
+        font-size: 14px;
+        text-decoration: none;
+        transition: all 0.15s;
+        margin-bottom: 3px;
+      }
+
+      .nav-item:hover {
+        background: rgba(255, 255, 255, 0.06);
+        color: #fff;
+      }
+      .nav-item.active {
+        background: var(--accent);
+        color: #ffffff;
+        box-shadow: 0 2px 8px rgba(67, 97, 238, 0.3);
+      }
+
+      .badge {
+        min-width: 40px;
+        height: 20px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 8px;
+        border-radius: 999px;
+        color: #6b7d95;
+        background: rgba(255, 255, 255, 0.08);
+        font-size: 11px;
+        font-weight: 900;
+        white-space: nowrap;
+      }
+
+      .badge.live {
+        color: #4ade80;
+        background: rgba(74, 222, 128, 0.15);
+      }
+      .nav-item.active .badge {
+        color: #fff;
+        background: rgba(255, 255, 255, 0.2);
+      }
+
+      .main {
+        min-width: 0;
+        display: grid;
+        grid-template-rows: 66px minmax(0, 1fr);
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
+        padding: 0 28px;
+        background: var(--surface);
+        border-bottom: 1px solid var(--line);
+      }
+
+      .crumb {
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .system-state {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .pill {
+        height: 32px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 0 12px;
+        border-radius: 999px;
+        color: var(--green);
+        background: var(--green-soft);
+        font-size: 13px;
+        font-weight: 900;
+        white-space: nowrap;
+      }
+      .pill.error {
+        color: var(--red);
+        background: var(--red-soft);
+      }
+
+      /* 内容区允许自然滚动，不再强制一屏高度 */
+      .content {
+        padding: 24px 28px 40px;
+        overflow: auto;
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 18px;
+        align-items: end;
+        margin-bottom: 18px;
+        background: var(--hero-gradient);
+        border-radius: var(--radius-lg);
+        padding: 28px 32px;
+        color: #fff;
+        position: relative;
+        overflow: hidden;
+      }
+      .hero::before {
+        content: "";
+        position: absolute;
+        top: -50px;
+        right: -40px;
+        width: 200px;
+        height: 200px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.04);
+      }
+      .hero::after {
+        content: "";
+        position: absolute;
+        bottom: -60px;
+        left: 30%;
+        width: 260px;
+        height: 260px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      .hero .eyebrow {
+        margin-bottom: 8px;
+        color: rgba(255, 255, 255, 0.8);
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+
+      .hero h1 {
+        margin: 0;
+        font-size: 26px;
+        font-weight: 900;
+        color: #fff;
+        position: relative;
+        z-index: 1;
+      }
+      .hero .hero-desc {
+        max-width: 850px;
+        margin-top: 6px;
+        color: rgba(255, 255, 255, 0.75);
+        line-height: 1.7;
+        font-size: 13px;
+      }
+
+      .hero .hero-actions {
+        position: relative;
+        z-index: 1;
+      }
+      .hero .btn.ghost {
+        color: #fff;
+        border-color: rgba(255, 255, 255, 0.3);
+        background: transparent;
+      }
+
+      .hero-actions {
+        display: flex;
+        gap: 10px;
+      }
+
+      .btn {
+        height: 40px;
+        min-width: 104px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        padding: 0 15px;
+        border-radius: 6px;
+        color: #ffffff;
+        background: var(--blue);
+        font-weight: 900;
+      }
+
+      .btn.secondary {
+        color: #24475f;
+        background: #dfeaf2;
+      }
+      .btn.ghost {
+        color: var(--muted);
+        background: transparent;
+        border: 1px solid var(--line);
+      }
+      .btn.ghost:hover {
+        background: rgba(0, 0, 0, 0.04);
+      }
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .workspace {
+        display: grid;
+        grid-template-columns: 1fr; /* 垂直流，不再左右分栏 */
+        gap: 18px;
+        max-width: 1160px;
+        margin: 0 auto;
+      }
+
+      .panel {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow-soft);
+      }
+
+      .panel-head {
+        min-height: 58px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 16px 18px 12px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .panel-title {
+        color: var(--blue-dark);
+        font-size: 17px;
+        font-weight: 900;
+      }
+      .panel-sub {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 900;
       }
 
       .panel-body {
-        padding: 16px 18px 18px;
+        padding: 18px;
       }
 
-      .input-panel textarea {
-        min-height: 88px;
-        max-height: 112px;
-        line-height: 1.65;
+      .form {
+        display: grid;
+        gap: 14px;
       }
 
-      .input-panel.has-result textarea {
-        min-height: 70px;
-        max-height: 88px;
+      .field {
+        display: grid;
+        gap: 7px;
       }
 
-      .compact-form-row {
-        margin-top: 0;
+      label {
+        color: #3f5367;
+        font-size: 13px;
+        font-weight: 900;
       }
 
-      .compact-form-row .btn {
-        height: 38px;
+      textarea,
+      input {
+        width: 100%;
+        border: 1px solid #44445c;
+        border-radius: 6px;
+        color: #e8edf3;
+        background: #2c2c40;
+        outline: none;
+      }
+
+      textarea {
+        min-height: 160px; /* 适度缩小最小高度 */
+        padding: 13px 14px;
+        resize: vertical;
+        line-height: 1.75;
       }
 
       input {
-        height: 38px;
+        height: 40px;
+        padding: 0 12px;
       }
 
-      .output-panel,
-      .output-panel .panel-body,
-      .compact-output {
-        min-height: 0;
+      textarea:focus,
+      input:focus {
+        border-color: var(--blue);
+        box-shadow: 0 0 0 3px rgba(31, 120, 181, 0.12);
       }
 
-      .compact-output {
+      .form-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: end;
         gap: 12px;
       }
 
-      .compact-empty {
-        min-height: 104px;
+      .hot-event-field {
+        display: none;
+      }
+      .input-panel.show-advanced .hot-event-field {
+        display: block;
       }
 
-      .secondary-output {
-        min-height: 76px;
+      .advanced-toggle {
+        flex: 0 0 auto;
+      }
+      #resetBtn,
+      #analyzeBtn {
+        flex: 0 0 auto;
       }
 
-      .result-hero.compact-result .result-band {
-        min-height: 48px;
-        padding: 12px 16px;
+      .check-mode-selector {
+        position: relative;
+        flex: 0 0 auto;
       }
 
-      .result-hero.compact-result .analysis {
-        padding: 16px 18px 18px;
+      .mode-select-trigger {
+        min-width: 128px;
+        height: 42px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 0 14px;
+        border: 1px solid #c8d7e3;
+        border-radius: 8px;
+        color: #15384f;
+        background: #ffffff;
+        font-weight: 900;
+      }
+
+      .mode-select-trigger:disabled {
+        opacity: 0.58;
+        cursor: not-allowed;
+      }
+      .mode-select-icon {
+        width: 18px;
+        display: inline-flex;
+        justify-content: center;
+        color: #0f7d86;
+        font-weight: 900;
+      }
+      .mode-select-caret {
+        color: #7a8b9c;
+        font-size: 13px;
+      }
+
+      .mode-select-menu {
+        position: absolute;
+        right: 0;
+        bottom: calc(100% + 10px);
+        z-index: 40;
+        width: 292px;
+        display: none;
+        padding: 8px;
+        border: 1px solid #dbe5ee;
+        border-radius: 10px;
+        background: #ffffff;
+        box-shadow: 0 20px 46px rgba(15, 38, 55, 0.18);
+      }
+
+      .check-mode-selector.open .mode-select-menu {
+        display: grid;
+        gap: 4px;
+      }
+
+      .mode-select-option {
+        width: 100%;
+        display: grid;
+        grid-template-columns: 24px minmax(0, 1fr) 20px;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 9px;
+        border-radius: 8px;
+        color: #16364d;
+        background: transparent;
+        text-align: left;
+      }
+
+      .mode-select-option:hover,
+      .mode-select-option.active {
+        background: #f3f8fb;
+      }
+      .mode-select-option strong,
+      .mode-select-option small {
+        display: block;
+        line-height: 1.35;
+      }
+      .mode-select-option small {
+        margin-top: 3px;
+        color: #8a98a8;
+        font-weight: 700;
+      }
+      .mode-selected-mark {
+        visibility: hidden;
+        color: #0b1f2d;
+        font-weight: 900;
+      }
+      .mode-select-option.active .mode-selected-mark {
+        visibility: visible;
+      }
+
+      /* 空状态与结果区域的现代化处理 */
+      .empty-state {
+        min-height: 160px;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        border-radius: 10px;
+        background:
+          radial-gradient(
+            circle at 50% 28%,
+            rgba(45, 120, 168, 0.08),
+            transparent 34%
+          ),
+          linear-gradient(180deg, #fbfdfe, #f7fafc);
+        border: 1px solid #dce7ef;
+        color: var(--muted);
+        text-align: center;
+        line-height: 1.8;
+      }
+
+      .empty-state-content {
+        display: grid;
+        gap: 8px;
+        justify-items: center;
+      }
+
+      .empty-state-icon {
+        width: 48px;
+        height: 48px;
+        display: grid;
+        place-items: center;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #edf6fb, #ffffff);
+        box-shadow:
+          inset 0 0 0 1px rgba(45, 120, 168, 0.1),
+          0 12px 26px rgba(45, 120, 168, 0.1);
+        color: #2d78a8;
+        font-size: 24px;
+      }
+
+      /* 结果卡片 */
+      .result-hero {
+        border: 1px solid #dce7ef;
+        border-radius: 10px;
+        background: #ffffff;
+        overflow: hidden;
+      }
+
+      .result-band {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 14px;
+        align-items: center;
+        padding: 17px 18px;
+        background: #ffffff;
+        border-bottom: 1px solid #dce7ef;
+      }
+
+      .tag {
+        min-width: 74px;
+        height: 31px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 11px;
+        border-radius: 5px;
+        font-size: 13px;
+        font-weight: 900;
+        white-space: nowrap;
+      }
+
+      .tag.true,
+      .tag.support,
+      .tag.supported,
+      .tag.success {
+        color: var(--green);
+        background: var(--green-soft);
+      }
+      .tag.false,
+      .tag.attack,
+      .tag.not_supported,
+      .tag.failed {
+        color: var(--red);
+        background: var(--red-soft);
+      }
+      .tag.partly_true,
+      .tag.partly_supported,
+      .tag.insufficient_evidence,
+      .tag.neutral,
+      .tag.running,
+      .tag.pending {
+        color: var(--amber);
+        background: var(--amber-soft);
       }
 
       .conclusion {
         font-size: 22px;
-        margin-bottom: 6px;
+        line-height: 1.55;
+        font-weight: 900;
       }
-
       .analysis {
-        line-height: 1.65;
+        padding: 16px 18px 18px;
+        color: #35495d;
+        line-height: 1.85;
+        font-size: 14px;
       }
 
-      .summary-item {
-        min-height: 62px;
-        padding: 11px 13px;
-      }
-
-      .summary-value {
-        margin-top: 5px;
-        font-size: 17px;
-      }
-    }
-
-    .export-btn {
-      width: auto;
-      min-width: 96px;
-      height: 36px;
-      font-size: 13px;
-    }
-
-    .export-btn:disabled {
-      opacity: 0.48;
-      cursor: not-allowed;
-    }
-
-    .result-summary {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 12px;
-    }
-
-    .summary-item {
-      min-height: 76px;
-      padding: 14px 15px;
-      border: 1px solid #d9e4ec;
-      border-radius: 8px;
-      background: #fbfdff;
-    }
-
-    .summary-label {
-      color: #6a7d8e;
-      font-size: 12px;
-      font-weight: 900;
-    }
-
-    .summary-value {
-      margin-top: 7px;
-      color: #0d354b;
-      font-size: 19px;
-      font-weight: 900;
-    }
-
-    #reportView {
-      display: none;
-    }
-
-    @media (max-width: 1180px) {
-      .workspace {
-        grid-template-columns: 1fr;
-      }
-
-      .overview {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
-    }
-
-    @media (max-width: 820px) {
-      .app {
-        grid-template-columns: 1fr;
-      }
-
-      .topbar,
-      .hero,
-      .form-row,
-      .result-band {
-        display: grid;
-        grid-template-columns: 1fr;
-      }
-
-      .topbar {
-        height: auto;
-        padding: 14px 18px;
-      }
-
-      .content {
-        padding: 18px 14px 28px;
-      }
-
-      .source-switch {
-        grid-template-columns: 1fr;
-      }
-
-      .overview {
-        grid-template-columns: 1fr;
-      }
-
-      .compact-workspace {
-        max-width: none;
-      }
-
-      .compact-form-row {
-        grid-template-columns: 1fr;
-      }
-
-      .compact-form-row .btn {
-        width: 100%;
-      }
-
-      .advanced-toggle,
-      #resetBtn,
-      #analyzeBtn,
-      .input-panel.show-advanced .advanced-toggle {
-        grid-column: auto;
-        justify-self: stretch;
-      }
-
-      .input-panel.show-advanced .hot-event-field {
-        max-width: none;
+      .muted {
+        color: var(--muted);
+        font-size: 13px;
       }
 
       .result-summary {
-        grid-template-columns: 1fr;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 12px;
+        margin-top: 18px;
       }
 
-  
-    .output-actions {
-      display: flex;
-      align-items: center;
-      justify-content: flex-end;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-
-    .report-preview-modal {
-      position: fixed;
-      inset: 0;
-      z-index: 80;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      padding: 28px;
-      background: rgba(13, 34, 50, 0.54);
-    }
-
-    .report-preview-modal.show {
-      display: flex;
-    }
-
-    .report-preview-dialog {
-      width: min(1120px, 100%);
-      height: min(820px, calc(100vh - 56px));
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      border-radius: 10px;
-      background: #ffffff;
-      box-shadow: 0 28px 80px rgba(15, 38, 55, 0.24);
-    }
-
-    .report-preview-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-      padding: 16px 20px;
-      border-bottom: 1px solid #dbe5ee;
-    }
-
-    .report-preview-title {
-      margin: 0;
-      color: #0d2d43;
-      font-size: 18px;
-      font-weight: 900;
-    }
-
-    .report-preview-frame {
-      flex: 1;
-      width: 100%;
-      border: 0;
-      background: #ffffff;
-    }
-    .mode-switch {
-        width: 100%;
+      .summary-item {
+        min-height: 76px;
+        padding: 14px 15px;
+        border: 1px solid #d9e4ec;
+        border-radius: 8px;
+        background: #fbfdff;
       }
 
-      .mode-tab {
+      .summary-label {
+        color: #6a7d8e;
+        font-size: 12px;
+        font-weight: 900;
+      }
+      .summary-value {
+        margin-top: 7px;
+        color: #0d354b;
+        font-size: 19px;
+        font-weight: 900;
+      }
+
+      .output-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .toast {
+        position: fixed;
+        right: 24px;
+        bottom: 24px;
+        max-width: 420px;
+        min-width: 260px;
+        padding: 13px 15px;
+        border-radius: 8px;
+        color: #ffffff;
+        background: #1f2937;
+        box-shadow: var(--shadow);
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(10px);
+        transition: 0.2s ease;
+        z-index: 30;
+      }
+
+      .toast.show {
+        opacity: 1;
+        transform: translateY(0);
+      }
+      .toast.error {
+        background: var(--red);
+      }
+
+      .report-preview-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 80;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 28px;
+        background: rgba(13, 34, 50, 0.54);
+      }
+
+      .report-preview-modal.show {
+        display: flex;
+      }
+
+      .report-preview-dialog {
+        width: min(1120px, 100%);
+        height: min(820px, calc(100vh - 56px));
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        border-radius: 10px;
+        background: #ffffff;
+        box-shadow: 0 28px 80px rgba(15, 38, 55, 0.24);
+      }
+
+      .report-preview-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 16px 20px;
+        border-bottom: 1px solid #dbe5ee;
+      }
+
+      .report-preview-title {
+        margin: 0;
+        color: #0d2d43;
+        font-size: 18px;
+        font-weight: 900;
+      }
+      .report-preview-frame {
         flex: 1;
+        width: 100%;
+        border: 0;
+        background: #ffffff;
       }
 
-      .dialog-body {
-        grid-template-columns: 1fr;
+      @media (max-width: 820px) {
+        .app {
+          grid-template-columns: 1fr;
+        }
+        .topbar {
+          height: auto;
+          padding: 14px 18px;
+        }
+        .content {
+          padding: 18px 14px 28px;
+        }
+        .form-row {
+          flex-direction: column;
+          align-items: stretch;
+        }
+        .form-row > * {
+          width: 100%;
+        }
       }
-
-      .claim {
-        grid-template-columns: 32px 1fr;
-      }
-
-      .claim .tag {
-        grid-column: 2;
-        width: max-content;
-      }
-    }
-
-    #reportView {
-      display: none !important;
-    }
-  
-    /* 统一侧边导航视觉：三个独立 HTML 页面保持同一套菜单颜色 */
-    .sidebar {
-      background: #243545 !important;
-      color: #dbe7f0 !important;
-      border-right: 1px solid #182635 !important;
-    }
-
-    .sidebar .brand {
-      background: #192938 !important;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
-    }
-
-    .sidebar .brand-mark {
-      color: #102a3b !important;
-      background: #f3c84b !important;
-      border-radius: 7px !important;
-    }
-
-    .sidebar .brand-name {
-      color: #f5fbff !important;
-    }
-
-    .sidebar .brand-desc {
-      color: #9eb0bf !important;
-    }
-
-    .sidebar .nav-title {
-      color: #91a5b6 !important;
-    }
-
-    .sidebar .nav-item {
-      background: transparent !important;
-      color: #dbe7f0 !important;
-      border-radius: 6px !important;
-      box-shadow: none !important;
-      transform: none !important;
-      text-decoration: none !important;
-    }
-
-    .sidebar .nav-item:hover {
-      background: rgba(255, 255, 255, 0.08) !important;
-      transform: none !important;
-    }
-
-    .sidebar .nav-item.active {
-      background: #1f78b5 !important;
-      color: #ffffff !important;
-      box-shadow: none !important;
-    }
-
-    .sidebar .badge,
-    .sidebar .tag {
-      min-width: 42px !important;
-      height: 22px !important;
-      display: inline-flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      padding: 0 8px !important;
-      border-radius: 999px !important;
-      font-size: 12px !important;
-      font-weight: 900 !important;
-      white-space: nowrap !important;
-    }
-
-    .sidebar .badge,
-    .sidebar .tag:not(.pos) {
-      color: #566a7d !important;
-      background: #e5edf4 !important;
-    }
-
-    .sidebar .badge.live,
-    .sidebar .tag.pos {
-      color: #0a5b3b !important;
-      background: #cfeedd !important;
-    }
-
-    /* 统一侧边栏尺寸：避免三个页面左侧栏宽度和菜单边距不一致 */
-    .app {
-      grid-template-columns: 260px minmax(0, 1fr) !important;
-    }
-
-    .sidebar {
-      width: 260px !important;
-      flex: 0 0 260px !important;
-    }
-
-    .sidebar .brand {
-      height: 82px !important;
-      padding: 0 22px !important;
-      gap: 12px !important;
-    }
-
-    .sidebar .brand-mark {
-      width: 38px !important;
-      height: 38px !important;
-    }
-
-    .sidebar .nav-block {
-      padding: 18px 14px 8px !important;
-    }
-
-    .sidebar .nav-item {
-      width: 100% !important;
-      min-height: 44px !important;
-      grid-template-columns: 24px 1fr auto !important;
-      gap: 10px !important;
-      padding: 0 12px !important;
-      margin-left: 0 !important;
-      margin-right: 0 !important;
-    }
-
-    .sidebar .nav-item + .nav-item {
-      margin-top: 5px !important;
-    }
-</style>
-</head>
-<body>
-  <div class="app">
-    <aside class="sidebar">
-      <div class="brand">
-        <div class="brand-mark">SG</div>
-        <div>
-          <div class="brand-name">SentiGuard</div>
-          <div class="brand-desc">舆情监测与事实核查平台</div>
-        </div>
-      </div>
-
-      <div class="nav-block">
-        <div class="nav-title">功能导航</div>
-        <a href="/dashboard.html" class="nav-item">
-          <span>🔥</span><span>舆情监测</span><span class="badge live">实时</span>
-        </a>
-        <a href="/opinion.html" class="nav-item">
-          <span>◉</span><span>观点分析</span><span class="badge live">分析</span>
-        </a>
-        <a href="/" class="nav-item active">
-          <span>✓</span><span>核查工作台</span><span class="badge">提交</span>
-        </a>
-        <a href="/history.html" class="nav-item">
-          <span>▤</span><span>核查历史</span><span class="badge live">在线</span>
-        </a>
-      </div>
-    </aside>
-
-    <main class="main">
-      <header class="topbar">
-        <div class="crumb">事实核查</div>
-        <div class="system-state">
-          <span id="currentUser" class="pill" style="cursor:default">未登录</span>
-          <span id="backendStatus" class="pill">后端检测中</span>
-          <span id="dbStatus" class="pill">数据库检测中</span>
-          <button id="logoutBtn" class="btn ghost" type="button" style="min-width:60px;height:32px;font-size:12px;">退出</button>
-        </div>
-      </header>
-
-      <section class="content">
-        <section class="hero">
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">SG</div>
           <div>
-            
-            <h1>核查工作台</h1>
-            <div class="hero-desc">
-              面向公开信息、政策表述与事件陈述的事实核验，形成可追溯的结论、证据与报告。
-            </div>
+            <div class="brand-name">SentiGuard</div>
+            <div class="brand-desc">舆情监测与事实核查平台</div>
           </div>
-          <div class="hero-actions">
-            <a class="btn ghost" href="/history.html">核查历史</a>
-          </div>
-        </section>
+        </div>
+        <div class="nav-block">
+          <div class="nav-title">功能导航</div>
+          <a href="/dashboard.html" class="nav-item"
+            ><span>🔥</span><span>舆情监测</span
+            ><span class="badge live">实时</span></a
+          >
+          <a href="/opinion.html" class="nav-item"
+            ><span>◉</span><span>观点分析</span
+            ><span class="badge live">分析</span></a
+          >
+          <a href="/" class="nav-item active"
+            ><span>✓</span><span>核查工作台</span
+            ><span class="badge">提交</span></a
+          >
+          <a href="/history.html" class="nav-item"
+            ><span>▤</span><span>核查历史</span
+            ><span class="badge live">在线</span></a
+          >
+        </div>
+      </aside>
 
-        <section class="overview compact-hidden" aria-hidden="true">
-          <div id="metricTask">-</div>
-          <div id="metricStatus">待提交</div>
-          <div id="metricClaims">0</div>
-          <div id="metricEvidence">0</div>
-        </section>
-<section class="workspace compact-workspace">
-          <div id="inputPanel" class="panel input-panel">
-            <div class="panel-head">
-              <div>
-                <div class="panel-title">提交核查</div>
-                <div class="panel-sub">输入待核查陈述，必要时关联热点编号</div>
+      <main class="main">
+        <header class="topbar">
+          <div class="crumb">事实核查</div>
+          <div class="system-state">
+            <span id="currentUser" class="pill" style="cursor: default"
+              >未登录</span
+            >
+            <span id="backendStatus" class="pill">后端检测中</span>
+            <span id="dbStatus" class="pill">数据库检测中</span>
+            <button
+              id="logoutBtn"
+              class="btn ghost"
+              type="button"
+              style="min-width: 60px; height: 32px; font-size: 12px"
+            >
+              退出
+            </button>
+          </div>
+        </header>
+
+        <section class="content">
+          <section class="hero">
+            <div>
+              <div class="eyebrow">Fact-Check Workspace</div>
+              <h1>核查工作台</h1>
+              <div class="hero-desc">
+                面向公开信息、政策表述与事件陈述的事实核验，形成可追溯的结论、证据与报告。
               </div>
             </div>
-            <div class="panel-body">
-              <form id="checkForm" class="form">
-                <div class="field">
-                  <label for="inputText">待核查陈述</label>
-                  <textarea id="inputText" required placeholder="请输入待核查的事实性陈述，可包含时间、地点、主体和事件描述。"></textarea>
-                </div>
+            <div class="hero-actions">
+              <a class="btn ghost" href="/history.html">核查历史</a>
+            </div>
+          </section>
 
-                <div class="form-row compact-form-row">
-                  <div class="field hot-event-field">
-                    <label for="hotEventId">关联热点 ID</label>
-                    <input id="hotEventId" type="number" min="1" placeholder="可选">
+          <section class="workspace">
+            <!-- 输入面板 -->
+            <div id="inputPanel" class="panel input-panel">
+              <div class="panel-head">
+                <div>
+                  <div class="panel-title">提交核查</div>
+                  <div class="panel-sub">
+                    输入待核查陈述，必要时关联热点编号
                   </div>
-                  <button id="advancedToggle" class="btn ghost advanced-toggle" type="button">高级选项</button>
-                  <div id="checkModeSelector" class="check-mode-selector">
-                    <button id="modeSelectBtn" class="mode-select-trigger" type="button" aria-haspopup="true" aria-expanded="false">
-                      <span id="modeSelectIcon" class="mode-select-icon">↯</span>
-                      <span id="modeSelectText" class="mode-select-text">快速核查</span>
-                      <span class="mode-select-caret">⌄</span>
-                    </button>
-                    <div id="modeSelectMenu" class="mode-select-menu" role="menu">
-                      <button class="mode-select-option active" type="button" data-check-mode="quick" role="menuitem">
-                        <span class="mode-select-icon">↯</span>
-                        <span><strong>快速核查</strong><small>适用于大部分情况</small></span>
-                        <span class="mode-selected-mark">✓</span>
-                      </button>
-                      <button class="mode-select-option" type="button" data-check-mode="deep" role="menuitem">
-                        <span class="mode-select-icon">✣</span>
-                        <span><strong>深度核查</strong><small>多轮反思与完整证据检索</small></span>
-                        <span class="mode-selected-mark">✓</span>
-                      </button>
+                </div>
+              </div>
+              <div class="panel-body">
+                <form id="checkForm" class="form">
+                  <div class="field">
+                    <label for="inputText">待核查陈述</label>
+                    <textarea
+                      id="inputText"
+                      required
+                      placeholder="请输入待核查的事实性陈述，可包含时间、地点、主体和事件描述。"
+                    ></textarea>
+                  </div>
+
+                  <div class="form-row">
+                    <div class="field hot-event-field">
+                      <label for="hotEventId">关联热点 ID</label>
+                      <input
+                        id="hotEventId"
+                        type="number"
+                        min="1"
+                        placeholder="可选"
+                      />
                     </div>
+                    <button
+                      id="advancedToggle"
+                      class="btn ghost advanced-toggle"
+                      type="button"
+                    >
+                      高级选项
+                    </button>
+                    <div id="checkModeSelector" class="check-mode-selector">
+                      <button
+                        id="modeSelectBtn"
+                        class="mode-select-trigger"
+                        type="button"
+                        aria-haspopup="true"
+                        aria-expanded="false"
+                      >
+                        <span id="modeSelectIcon" class="mode-select-icon"
+                          >↯</span
+                        >
+                        <span id="modeSelectText" class="mode-select-text"
+                          >快速核查</span
+                        >
+                        <span class="mode-select-caret">⌄</span>
+                      </button>
+                      <div
+                        id="modeSelectMenu"
+                        class="mode-select-menu"
+                        role="menu"
+                      >
+                        <button
+                          class="mode-select-option active"
+                          type="button"
+                          data-check-mode="quick"
+                          role="menuitem"
+                        >
+                          <span class="mode-select-icon">↯</span>
+                          <span
+                            ><strong>快速核查</strong
+                            ><small>适用于大部分情况</small></span
+                          >
+                          <span class="mode-selected-mark">✓</span>
+                        </button>
+                        <button
+                          class="mode-select-option"
+                          type="button"
+                          data-check-mode="deep"
+                          role="menuitem"
+                        >
+                          <span class="mode-select-icon">✣</span>
+                          <span
+                            ><strong>深度核查</strong
+                            ><small>多轮反思与完整证据检索</small></span
+                          >
+                          <span class="mode-selected-mark">✓</span>
+                        </button>
+                      </div>
+                    </div>
+                    <button id="resetBtn" class="btn ghost" type="button">
+                      重置
+                    </button>
+                    <button id="analyzeBtn" class="btn" type="submit">
+                      开始核查
+                    </button>
                   </div>
-                  <button id="resetBtn" class="btn ghost" type="button">重置</button>
-                  <button id="analyzeBtn" class="btn" type="submit">开始核查</button>
+                </form>
+              </div>
+            </div>
+
+            <!-- 输出面板 -->
+            <div class="panel output-panel">
+              <div class="panel-head">
+                <div>
+                  <div class="panel-title">核查结果</div>
+                  <div id="taskMeta" class="panel-sub">提交后展示核查结论</div>
                 </div>
-              </form>
-            </div>
-          </div>
-
-          <div class="panel output-panel">
-            <div class="panel-head">
-              <div>
-                <div class="panel-title">核查结果</div>
-                <div id="taskMeta" class="panel-sub">提交后展示核查结论</div>
+                <div class="output-actions">
+                  <button
+                    id="previewReportBtn"
+                    class="btn ghost export-btn"
+                    type="button"
+                    disabled
+                  >
+                    预览报告
+                  </button>
+                  <button
+                    id="exportBtn"
+                    class="btn ghost export-btn"
+                    type="button"
+                    disabled
+                  >
+                    导出详情
+                  </button>
+                </div>
               </div>
-              <div class="output-actions">
-                <button id="previewReportBtn" class="btn ghost export-btn" type="button" disabled>预览报告</button>
-                <button id="exportBtn" class="btn ghost export-btn" type="button" disabled>导出详情</button>
+              <div class="panel-body">
+                <!-- 单一结果容器，高度由内容决定 -->
+                <div id="resultContainer" class="empty-state">
+                  <div class="empty-state-content">
+                    <div class="empty-state-icon">✓</div>
+                    <div>暂无核查结果</div>
+                  </div>
+                </div>
               </div>
             </div>
-            <div class="panel-body compact-output">
-              <div id="resultView" class="empty compact-empty">暂无核查结果</div>
-              <div id="claimEvidenceView" class="empty compact-empty secondary-output" style="display:none"></div>
-              <div id="reportView" class="empty compact-report">核查详情将在导出文件中提供。</div>
-            </div>
-          </div>
+          </section>
         </section>
-        </section>
-    </main>
-  </div>
+      </main>
+    </div>
 
-  <div id="toast" class="toast"></div>
+    <div id="toast" class="toast"></div>
 
-  <div id="reportPreviewModal" class="report-preview-modal" aria-hidden="true">
-    <section class="report-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="reportPreviewTitle">
-      <div class="report-preview-head">
-        <h2 id="reportPreviewTitle" class="report-preview-title">核查报告预览</h2>
-        <button id="closeReportPreviewBtn" class="btn ghost icon" type="button" aria-label="关闭">×</button>
-      </div>
-      <iframe id="reportPreviewFrame" class="report-preview-frame" title="核查报告 HTML 预览" sandbox></iframe>
-    </section>
-  </div>
+    <div
+      id="reportPreviewModal"
+      class="report-preview-modal"
+      aria-hidden="true"
+    >
+      <section
+        class="report-preview-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="reportPreviewTitle"
+      >
+        <div class="report-preview-head">
+          <h2 id="reportPreviewTitle" class="report-preview-title">
+            核查报告预览
+          </h2>
+          <button
+            id="closeReportPreviewBtn"
+            class="btn ghost icon"
+            type="button"
+            aria-label="关闭"
+          >
+            ×
+          </button>
+        </div>
+        <iframe
+          id="reportPreviewFrame"
+          class="report-preview-frame"
+          title="核查报告 HTML 预览"
+          sandbox
+        ></iframe>
+      </section>
+    </div>
 
-  <script>
-    const el = {
-      backendStatus: document.getElementById('backendStatus'),
-      dbStatus: document.getElementById('dbStatus'),
-      checkModeSelector: document.getElementById('checkModeSelector'),
-      modeSelectBtn: document.getElementById('modeSelectBtn'),
-      modeSelectMenu: document.getElementById('modeSelectMenu'),
-      modeSelectText: document.getElementById('modeSelectText'),
-      modeSelectIcon: document.getElementById('modeSelectIcon'),
-      form: document.getElementById('checkForm'),
-      inputPanel: document.getElementById('inputPanel'),
-      inputText: document.getElementById('inputText'),
-      hotEventId: document.getElementById('hotEventId'),
-      analyzeBtn: document.getElementById('analyzeBtn'),
-      resetBtn: document.getElementById('resetBtn'),
-      advancedToggle: document.getElementById('advancedToggle'),
-      exportBtn: document.getElementById('exportBtn'),
-      previewReportBtn: document.getElementById('previewReportBtn'),
-      reportPreviewModal: document.getElementById('reportPreviewModal'),
-      reportPreviewFrame: document.getElementById('reportPreviewFrame'),
-      closeReportPreviewBtn: document.getElementById('closeReportPreviewBtn'),
-      currentUser: document.getElementById('currentUser'),
-      logoutBtn: document.getElementById('logoutBtn'),
-      resultView: document.getElementById('resultView'),
-      claimEvidenceView: document.getElementById('claimEvidenceView'),
-      reportView: document.getElementById('reportView'),
-      taskMeta: document.getElementById('taskMeta'),
-      metricTask: document.getElementById('metricTask'),
-      metricStatus: document.getElementById('metricStatus'),
-      metricClaims: document.getElementById('metricClaims'),
-      metricEvidence: document.getElementById('metricEvidence'),
-      toast: document.getElementById('toast')
-    };
+    <script>
+      const el = {
+        backendStatus: document.getElementById("backendStatus"),
+        dbStatus: document.getElementById("dbStatus"),
+        checkModeSelector: document.getElementById("checkModeSelector"),
+        modeSelectBtn: document.getElementById("modeSelectBtn"),
+        modeSelectMenu: document.getElementById("modeSelectMenu"),
+        modeSelectText: document.getElementById("modeSelectText"),
+        modeSelectIcon: document.getElementById("modeSelectIcon"),
+        form: document.getElementById("checkForm"),
+        inputPanel: document.getElementById("inputPanel"),
+        inputText: document.getElementById("inputText"),
+        hotEventId: document.getElementById("hotEventId"),
+        analyzeBtn: document.getElementById("analyzeBtn"),
+        resetBtn: document.getElementById("resetBtn"),
+        advancedToggle: document.getElementById("advancedToggle"),
+        exportBtn: document.getElementById("exportBtn"),
+        previewReportBtn: document.getElementById("previewReportBtn"),
+        reportPreviewModal: document.getElementById("reportPreviewModal"),
+        reportPreviewFrame: document.getElementById("reportPreviewFrame"),
+        closeReportPreviewBtn: document.getElementById("closeReportPreviewBtn"),
+        currentUser: document.getElementById("currentUser"),
+        logoutBtn: document.getElementById("logoutBtn"),
+        resultContainer: document.getElementById("resultContainer"),
+        taskMeta: document.getElementById("taskMeta"),
+        toast: document.getElementById("toast"),
+      };
 
-    let currentDetail = null;
-    let selectedCheckMode = 'quick';
-    el.inputPanel.classList.remove('show-advanced', 'has-result');
+      let currentDetail = null;
+      let selectedCheckMode = "quick";
+      el.inputPanel.classList.remove("show-advanced", "has-result");
 
-    function getToken() {
-      return localStorage.getItem('sg_token');
-    }
-
-    async function requestJson(url, options) {
-      options = options || {};
-      var token = getToken();
-      var headers = { 'Content-Type': 'application/json' };
-      if (token) { headers['Authorization'] = 'Bearer ' + token; }
-      if (options.headers) {
-        Object.keys(options.headers).forEach(function(k) { headers[k] = options.headers[k]; });
+      function getToken() {
+        return localStorage.getItem("sg_token");
       }
-      var response = await fetch(url, {
-        headers: headers,
-        method: options.method || 'GET',
-        body: options.body
-      });
-      if (response.status === 401) {
-        localStorage.clear();
-        window.location.href = '/login.html';
-        throw new Error('请先登录');
-      }
-      var body = await response.json();
-      if (!response.ok || (body.code && body.code >= 400)) {
-        throw new Error(body.message || '请求失败');
-      }
-      return Object.prototype.hasOwnProperty.call(body, 'data') ? body.data : body;
-    }
 
-    function checkAuth() {
-      var token = getToken();
-      if (!token) {
-        window.location.href = '/login.html';
-        return false;
-      }
-      try {
-        var payload = JSON.parse(atob(token.split('.')[1]));
-        if (payload.exp * 1000 < Date.now()) {
+      async function requestJson(url, options = {}) {
+        const token = getToken();
+        const headers = {
+          "Content-Type": "application/json",
+          ...(options.headers || {}),
+        };
+        if (token) {
+          headers.Authorization = `Bearer ${token}`;
+        }
+        const response = await fetch(url, {
+          ...options,
+          headers,
+        });
+        if (response.status === 401) {
           localStorage.clear();
-          window.location.href = '/login.html';
+          window.location.href = "/login.html";
+          throw new Error("请先登录");
+        }
+        const body = await response.json();
+        if (!response.ok || (body.code && body.code >= 400)) {
+          throw new Error(body.message || "请求失败");
+        }
+        return Object.prototype.hasOwnProperty.call(body, "data")
+          ? body.data
+          : body;
+      }
+
+      function checkAuth() {
+        const token = getToken();
+        if (!token) {
+          window.location.href = "/login.html";
           return false;
         }
-      } catch (e) {
-        localStorage.clear();
-        window.location.href = '/login.html';
-        return false;
-      }
-      return true;
-    }
-
-    function logout() {
-      localStorage.clear();
-      window.location.href = '/login.html';
-    }
-
-    function escapeHtml(value) {
-      return String(value ?? '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
-    }
-
-    function showToast(message, type = 'info') {
-      el.toast.textContent = message;
-      el.toast.className = `toast show ${type === 'error' ? 'error' : ''}`;
-      setTimeout(() => {
-        el.toast.className = 'toast';
-      }, 2600);
-    }
-
-    function formatTime(value) {
-      if (!value) return '-';
-      return String(value).replace('T', ' ').slice(0, 19);
-    }
-
-    function normalizeLabelText(result) {
-      if (result.labelText) return result.labelText;
-      if (result.label === 'true' || result.label === 'supported') return '真实';
-      if (result.label === 'false' || result.label === 'not_supported') return '不支持';
-      if (result.label === 'partly_true' || result.label === 'partly_supported') return '部分支持';
-      if (result.label === 'insufficient_evidence') return '证据不足';
-      return result.label || '未知';
-    }
-
-    function relationText(relation) {
-      if (relation === 'support') return '支持';
-      if (relation === 'attack') return '反驳';
-      return '中立';
-    }
-
-    function tagClass(value) {
-      return value || 'neutral';
-    }
-
-    function parseStructuredText(value) {
-      if (!value) return null;
-      if (typeof value === 'object') return value;
-      const text = String(value).trim();
-      if (!text || !text.startsWith('{') || !text.endsWith('}')) return null;
-
-      try {
-        return JSON.parse(text);
-      } catch (error) {
-        // Some model adapters return a Python-like dict string with single quotes.
-      }
-
-      const normalized = text
-        .replace(/([{,]\s*)'([^']+?)'\s*:/g, '$1"$2":')
-        .replace(/:\s*'([\s\S]*?)'\s*(?=[,}])/g, (_, content) => `:${JSON.stringify(content)}`);
-      try {
-        return JSON.parse(normalized);
-      } catch (error) {
-        const explanationMatch = text.match(/['"]explanation['"]\s*:\s*['"]([\s\S]*?)['"]\s*(?:[,}])/);
-        if (explanationMatch) {
-          return { explanation: explanationMatch[1] };
+        try {
+          const payload = JSON.parse(atob(token.split(".")[1]));
+          if (payload.exp * 1000 < Date.now()) {
+            localStorage.clear();
+            window.location.href = "/login.html";
+            return false;
+          }
+        } catch (e) {
+          localStorage.clear();
+          window.location.href = "/login.html";
+          return false;
         }
-        return null;
+        return true;
       }
-    }
 
-    function isStructuredText(value) {
-      if (!value || typeof value !== 'string') return false;
-      const text = value.trim();
-      return text.startsWith('{') && text.endsWith('}');
-    }
-
-    function cleanDisplayText(value) {
-      if (value == null) return '';
-      if (typeof value === 'object') {
-        return value.explanation || value.conclusion || value.content || '';
+      function logout() {
+        localStorage.clear();
+        window.location.href = "/login.html";
       }
-      const parsed = parseStructuredText(value);
-      if (parsed) {
-        return parsed.explanation || parsed.conclusion || parsed.content || '';
+
+      function escapeHtml(value) {
+        return String(value ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
       }
-      return String(value).trim();
-    }
 
-    function normalizeResultDisplay(result) {
-      const parsedConclusion = parseStructuredText(result.conclusion);
-      const parsedAnalysis = parseStructuredText(result.analysisDetail);
-      const rawConclusion = isStructuredText(result.conclusion) ? '' : cleanDisplayText(result.conclusion);
-      const rawAnalysis = isStructuredText(result.analysisDetail) ? '' : cleanDisplayText(result.analysisDetail);
+      function showToast(message, type = "info") {
+        el.toast.textContent = message;
+        el.toast.className = `toast show ${type === "error" ? "error" : ""}`;
+        setTimeout(() => {
+          el.toast.className = "toast";
+        }, 2600);
+      }
 
-      return {
-        conclusion: rawConclusion
-          || cleanDisplayText(parsedConclusion && (parsedConclusion.conclusion || parsedConclusion.explanation))
-          || cleanDisplayText(parsedAnalysis && parsedAnalysis.conclusion)
-          || '暂无结论',
-        explanation: cleanDisplayText(parsedAnalysis && parsedAnalysis.explanation)
-          || rawAnalysis
-          || cleanDisplayText(parsedConclusion && parsedConclusion.explanation)
-          || '暂无详细分析。'
-      };
-    }
+      function formatTime(value) {
+        if (!value) return "-";
+        return String(value).replace("T", " ").slice(0, 19);
+      }
 
-    function isAgentGeneratedEvidence(evidence) {
-      const text = [
-        evidence.title,
-        evidence.evidenceTitle,
-        evidence.sourceName,
-        evidence.content,
-        evidence.evidenceContent
-      ].filter(Boolean).join(' ');
-      return text.includes('智能体核查解释')
-        || text.includes('SentiGuard FastAPI')
-        || text.includes('SentiGuard 智能体');
-    }
+      function normalizeLabelText(result) {
+        if (result.labelText) return result.labelText;
+        if (result.label === "true" || result.label === "supported")
+          return "真实";
+        if (result.label === "false" || result.label === "not_supported")
+          return "不支持";
+        if (
+          result.label === "partly_true" ||
+          result.label === "partly_supported"
+        )
+          return "部分支持";
+        if (result.label === "insufficient_evidence") return "证据不足";
+        return result.label || "未知";
+      }
 
-    function setCheckMode(mode) {
-      selectedCheckMode = mode === 'deep' ? 'deep' : 'quick';
-      const isDeep = selectedCheckMode === 'deep';
-      el.modeSelectText.textContent = isDeep ? '深度核查' : '快速核查';
-      el.modeSelectIcon.textContent = isDeep ? '✣' : '↯';
-      el.modeSelectMenu.querySelectorAll('.mode-select-option').forEach(option => {
-        option.classList.toggle('active', option.dataset.checkMode === selectedCheckMode);
-      });
-      closeModeMenu();
-    }
+      function relationText(relation) {
+        if (relation === "support") return "支持";
+        if (relation === "attack") return "反驳";
+        return "中立";
+      }
 
-    function openModeMenu() {
-      el.checkModeSelector.classList.add('open');
-      el.modeSelectBtn.setAttribute('aria-expanded', 'true');
-    }
+      function tagClass(value) {
+        return value || "neutral";
+      }
 
-    function closeModeMenu() {
-      el.checkModeSelector.classList.remove('open');
-      el.modeSelectBtn.setAttribute('aria-expanded', 'false');
-    }
+      function parseStructuredText(value) {
+        if (!value) return null;
+        if (typeof value === "object") return value;
+        const text = String(value).trim();
+        if (!text || !text.startsWith("{") || !text.endsWith("}")) return null;
+        try {
+          return JSON.parse(text);
+        } catch (error) {}
+        const normalized = text
+          .replace(/([{,]\s*)'([^']+?)'\s*:/g, '$1"$2":')
+          .replace(
+            /:\s*'([\s\S]*?)'\s*(?=[,}])/g,
+            (_, content) => `:${JSON.stringify(content)}`,
+          );
+        try {
+          return JSON.parse(normalized);
+        } catch (error) {
+          const explanationMatch = text.match(
+            /['"]explanation['"]\s*:\s*['"]([\s\S]*?)['"]\s*(?:[,}])/,
+          );
+          if (explanationMatch) return { explanation: explanationMatch[1] };
+          return null;
+        }
+      }
 
-    function toggleModeMenu() {
-      if (el.checkModeSelector.classList.contains('open')) {
+      function isStructuredText(value) {
+        if (!value || typeof value !== "string") return false;
+        const text = value.trim();
+        return text.startsWith("{") && text.endsWith("}");
+      }
+
+      function cleanDisplayText(value) {
+        if (value == null) return "";
+        if (typeof value === "object") {
+          return value.explanation || value.conclusion || value.content || "";
+        }
+        const parsed = parseStructuredText(value);
+        if (parsed)
+          return (
+            parsed.explanation || parsed.conclusion || parsed.content || ""
+          );
+        return String(value).trim();
+      }
+
+      function normalizeResultDisplay(result) {
+        const parsedConclusion = parseStructuredText(result.conclusion);
+        const parsedAnalysis = parseStructuredText(result.analysisDetail);
+        const rawConclusion = isStructuredText(result.conclusion)
+          ? ""
+          : cleanDisplayText(result.conclusion);
+        const rawAnalysis = isStructuredText(result.analysisDetail)
+          ? ""
+          : cleanDisplayText(result.analysisDetail);
+        return {
+          conclusion:
+            rawConclusion ||
+            cleanDisplayText(
+              parsedConclusion &&
+                (parsedConclusion.conclusion || parsedConclusion.explanation),
+            ) ||
+            cleanDisplayText(parsedAnalysis && parsedAnalysis.conclusion) ||
+            "暂无结论",
+          explanation:
+            cleanDisplayText(parsedAnalysis && parsedAnalysis.explanation) ||
+            rawAnalysis ||
+            cleanDisplayText(
+              parsedConclusion && parsedConclusion.explanation,
+            ) ||
+            "暂无详细分析。",
+        };
+      }
+
+      function isAgentGeneratedEvidence(evidence) {
+        const text = [
+          evidence.title,
+          evidence.evidenceTitle,
+          evidence.sourceName,
+          evidence.content,
+          evidence.evidenceContent,
+        ]
+          .filter(Boolean)
+          .join(" ");
+        return (
+          text.includes("智能体核查解释") ||
+          text.includes("SentiGuard FastAPI") ||
+          text.includes("SentiGuard 智能体")
+        );
+      }
+
+      function setCheckMode(mode) {
+        selectedCheckMode = mode === "deep" ? "deep" : "quick";
+        const isDeep = selectedCheckMode === "deep";
+        el.modeSelectText.textContent = isDeep ? "深度核查" : "快速核查";
+        el.modeSelectIcon.textContent = isDeep ? "✣" : "↯";
+        el.modeSelectMenu
+          .querySelectorAll(".mode-select-option")
+          .forEach((option) => {
+            option.classList.toggle(
+              "active",
+              option.dataset.checkMode === selectedCheckMode,
+            );
+          });
         closeModeMenu();
-      } else {
-        openModeMenu();
-      }
-    }
-
-    function buildExportContent(detail) {
-      const result = detail.result || {};
-      const claims = detail.claims || [];
-      const evidences = detail.evidences || [];
-      const report = detail.report || {};
-      const display = normalizeResultDisplay(result);
-      const lines = [
-        'SentiGuard 事实核查详情',
-        '',
-        `任务编号：${detail.taskId || '-'}`,
-        `任务状态：${detail.status || '-'}`,
-        `提交时间：${formatTime(detail.submitTime)}`,
-        `完成时间：${formatTime(detail.finishTime)}`,
-        '',
-        '一、待核查陈述',
-        detail.inputText || '-',
-        '',
-        '二、核查结论',
-        `置信度：${result.confidenceScore == null ? '-' : result.confidenceScore + '%'}`,
-        `结论摘要：${display.conclusion}`,
-        `分析说明：${display.explanation}`,
-        '',
-        '三、声明拆解'
-      ];
-
-      if (claims.length) {
-        claims.forEach((claim, index) => {
-          lines.push(`${index + 1}. ${claim.claimText || '-'}`);
-          lines.push(`   类型：${claim.claimType || '未分类'}`);
-        });
-      } else {
-        lines.push('暂无声明拆解结果');
       }
 
-      lines.push('', '四、证据材料');
-      if (evidences.length) {
-        evidences.forEach((evidence, index) => {
-          const url = evidence.url || evidence.evidenceUrl || '-';
-          const evidenceContent = cleanDisplayText(evidence.content || evidence.evidenceContent) || '-';
-          lines.push(`${index + 1}. ${evidence.title || evidence.evidenceTitle || '未命名证据'}`);
-          lines.push(`   关系：${relationText(evidence.relationType)}`);
-          lines.push(`   来源：${evidence.sourceName || '未知来源'}`);
-          lines.push(`   类型：${evidence.evidenceType || evidence.type || '证据'}`);
-          lines.push(`   链接：${url}`);
-          lines.push(`   内容：${evidenceContent}`);
-        });
-      } else {
-        lines.push('暂无证据材料');
+      function openModeMenu() {
+        el.checkModeSelector.classList.add("open");
+        el.modeSelectBtn.setAttribute("aria-expanded", "true");
       }
 
-      lines.push('', '五、核查报告', cleanDisplayText(report.content || report.reportContent) || '暂无报告内容');
-      return lines.join('\n');
-    }
-
-
-    function getReportContent(detail) {
-      const report = detail && detail.report ? detail.report : {};
-      return report.content || report.reportContent || '';
-    }
-
-    function hasReportContent(detail) {
-      return Boolean(String(getReportContent(detail)).trim());
-    }
-
-    function buildReportPreviewHtml(content) {
-      const value = String(content || '').trim();
-      if (!value) {
-        return '<!doctype html><html lang="zh-CN"><body style="font-family: Microsoft YaHei, Arial, sans-serif; padding: 32px; color: #63748a;">暂无报告内容</body></html>';
-      }
-      if (/<!doctype|<html[\s>]/i.test(value)) {
-        return value;
-      }
-      return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>body{margin:0;padding:32px;font-family:"Microsoft YaHei",Arial,sans-serif;color:#152235;background:#fff;line-height:1.75;}img,table{max-width:100%;}table{border-collapse:collapse;}td,th{border:1px solid #dbe5ee;padding:8px 10px;}h1,h2,h3{color:#0d2d43;}</style></head><body>${value}</body></html>`;
-    }
-
-    function previewReport() {
-      if (!hasReportContent(currentDetail)) {
-        showToast('暂无可预览的核查报告', 'error');
-        return;
-      }
-      el.reportPreviewFrame.srcdoc = buildReportPreviewHtml(getReportContent(currentDetail));
-      el.reportPreviewModal.classList.add('show');
-      el.reportPreviewModal.setAttribute('aria-hidden', 'false');
-      document.body.style.overflow = 'hidden';
-    }
-
-    function closeReportPreview() {
-      el.reportPreviewModal.classList.remove('show');
-      el.reportPreviewModal.setAttribute('aria-hidden', 'true');
-      el.reportPreviewFrame.srcdoc = '';
-      document.body.style.overflow = '';
-    }
-    function exportDetail() {
-      if (!currentDetail) {
-        showToast('暂无可导出的核查详情', 'error');
-        return;
-      }
-      const content = buildExportContent(currentDetail);
-      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `sentiguard-check-${currentDetail.taskId || 'detail'}.txt`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
-      showToast('核查详情已导出');
-    }
-
-    function toggleAdvancedOptions() {
-      const expanded = el.inputPanel.classList.toggle('show-advanced');
-      el.advancedToggle.textContent = expanded ? '收起选项' : '高级选项';
-    }
-
-    async function checkBackend() {
-      try {
-        await requestJson('/api/health');
-        el.backendStatus.textContent = '后端已连接';
-        el.backendStatus.classList.remove('error');
-      } catch (error) {
-        el.backendStatus.textContent = '后端异常';
-        el.backendStatus.classList.add('error');
-      }
-    }
-
-    async function checkDatabase() {
-      try {
-        const data = await requestJson('/api/health/db');
-        el.dbStatus.textContent = data.database || '数据库正常';
-        el.dbStatus.classList.remove('error');
-      } catch (error) {
-        el.dbStatus.textContent = '数据库异常';
-        el.dbStatus.classList.add('error');
-      }
-    }
-
-    async function analyze(event) {
-      event.preventDefault();
-      const inputText = el.inputText.value.trim();
-      if (!inputText) {
-        showToast('请输入待核查内容', 'error');
-        return;
-      }
-      const checkMode = selectedCheckMode;
-      const endpoint = checkMode === 'deep' ? '/api/fact-check/analyze/deep' : '/api/fact-check/analyze/quick';
-      const payload = { inputText, checkMode };
-      if (el.hotEventId.value) {
-        payload.hotEventId = Number(el.hotEventId.value);
+      function closeModeMenu() {
+        el.checkModeSelector.classList.remove("open");
+        el.modeSelectBtn.setAttribute("aria-expanded", "false");
       }
 
-      clearResultForLoading();
-      setAnalyzeButtonsLoading(true, checkMode);
-      el.metricStatus.textContent = '核查中';
-      el.taskMeta.textContent = '正在核查';
-
-      try {
-        const detail = await requestJson(endpoint, {
-          method: 'POST',
-          body: JSON.stringify(payload)
-        });
-        renderDetail(detail);
-        showToast('事实核查完成');
-      } catch (error) {
-        el.metricStatus.textContent = '核查失败';
-        el.taskMeta.textContent = '核查失败';
-        showToast(error.message, 'error');
-      } finally {
-        setAnalyzeButtonsLoading(false, checkMode);
+      function toggleModeMenu() {
+        if (el.checkModeSelector.classList.contains("open")) closeModeMenu();
+        else openModeMenu();
       }
-    }
 
-    function setAnalyzeButtonsLoading(loading, mode) {
-      el.analyzeBtn.disabled = loading;
-      el.modeSelectBtn.disabled = loading;
-      el.analyzeBtn.textContent = loading ? (mode === 'deep' ? '深度核查中...' : '快速核查中...') : '开始核查';
-    }
+      function buildExportContent(detail) {
+        const result = detail.result || {};
+        const claims = detail.claims || [];
+        const evidences = detail.evidences || [];
+        const report = detail.report || {};
+        const display = normalizeResultDisplay(result);
+        const lines = [
+          "SentiGuard 事实核查详情",
+          "",
+          `任务编号：${detail.taskId || "-"}`,
+          `任务状态：${detail.status || "-"}`,
+          `提交时间：${formatTime(detail.submitTime)}`,
+          `完成时间：${formatTime(detail.finishTime)}`,
+          "",
+          "一、待核查陈述",
+          detail.inputText || "-",
+          "",
+          "二、核查结论",
+          `置信度：${result.confidenceScore == null ? "-" : result.confidenceScore + "%"}`,
+          `结论摘要：${display.conclusion}`,
+          `分析说明：${display.explanation}`,
+          "",
+          "三、声明拆解",
+        ];
+        if (claims.length) {
+          claims.forEach((claim, index) => {
+            lines.push(`${index + 1}. ${claim.claimText || "-"}`);
+            lines.push(`   类型：${claim.claimType || "未分类"}`);
+          });
+        } else {
+          lines.push("暂无声明拆解结果");
+        }
+        lines.push("", "四、证据材料");
+        if (evidences.length) {
+          evidences.forEach((evidence, index) => {
+            const url = evidence.url || evidence.evidenceUrl || "-";
+            const evidenceContent =
+              cleanDisplayText(evidence.content || evidence.evidenceContent) ||
+              "-";
+            lines.push(
+              `${index + 1}. ${evidence.title || evidence.evidenceTitle || "未命名证据"}`,
+            );
+            lines.push(`   关系：${relationText(evidence.relationType)}`);
+            lines.push(`   来源：${evidence.sourceName || "未知来源"}`);
+            lines.push(
+              `   类型：${evidence.evidenceType || evidence.type || "证据"}`,
+            );
+            lines.push(`   链接：${url}`);
+            lines.push(`   内容：${evidenceContent}`);
+          });
+        } else {
+          lines.push("暂无证据材料");
+        }
+        lines.push(
+          "",
+          "五、核查报告",
+          cleanDisplayText(report.content || report.reportContent) ||
+            "暂无报告内容",
+        );
+        return lines.join("\n");
+      }
 
-    function clearResultForLoading() {
-      currentDetail = null;
-      el.inputPanel.classList.remove('has-result');
-      el.exportBtn.disabled = true;
-      el.previewReportBtn.disabled = true;
-      el.metricTask.textContent = '-';
-      el.metricStatus.textContent = '核查中';
-      el.metricClaims.textContent = '0';
-      el.metricEvidence.textContent = '0';
-      el.taskMeta.textContent = '正在核查';
-      el.resultView.className = 'empty';
-      el.resultView.textContent = '正在核查，请稍候...';
-      el.claimEvidenceView.className = 'empty';
-      el.claimEvidenceView.style.display = 'none';
-      el.claimEvidenceView.textContent = '';
-      el.reportView.className = 'empty';
-      el.reportView.textContent = '';
-    }
+      function getReportContent(detail) {
+        const report = detail && detail.report ? detail.report : {};
+        return report.content || report.reportContent || "";
+      }
 
-    function renderDetail(detail) {
-      currentDetail = detail;
-      el.inputPanel.classList.add('has-result');
-      el.exportBtn.disabled = false;
-      el.previewReportBtn.disabled = !hasReportContent(detail);
-      const result = detail.result || {};
-      const claims = detail.claims || [];
-      const evidences = detail.evidences || [];
-      const report = detail.report || {};
-      const display = normalizeResultDisplay(result);
+      function hasReportContent(detail) {
+        return Boolean(String(getReportContent(detail)).trim());
+      }
 
-      el.metricTask.textContent = detail.taskId || '-';
-      el.metricStatus.textContent = detail.status === 'success' ? '已完成' : (detail.status || '-');
-      el.metricClaims.textContent = claims.length;
-      el.metricEvidence.textContent = evidences.length;
-      el.taskMeta.textContent = `已完成 · ${formatTime(detail.finishTime || detail.submitTime)}`;
+      function buildReportPreviewHtml(content) {
+        const value = String(content || "").trim();
+        if (!value) {
+          return '<!doctype html><html lang="zh-CN"><body style="font-family: Microsoft YaHei, Arial, sans-serif; padding: 32px; color: #63748a;">暂无报告内容</body></html>';
+        }
+        if (/<!doctype|<html[\s>]/i.test(value)) return value;
+        return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>body{margin:0;padding:32px;font-family:"Microsoft YaHei",Arial,sans-serif;color:#152235;background:#fff;line-height:1.75;}img,table{max-width:100%;}table{border-collapse:collapse;}td,th{border:1px solid #dbe5ee;padding:8px 10px;}h1,h2,h3{color:#0d2d43;}</style></head><body>${value}</body></html>`;
+      }
 
-      const confidence = result.confidenceScore == null ? '' : `<span class="muted">置信度 ${escapeHtml(result.confidenceScore)}%</span>`;
-      el.resultView.className = '';
-      el.resultView.innerHTML = `
-        <div class="result-hero compact-result">
+      function previewReport() {
+        if (!hasReportContent(currentDetail)) {
+          showToast("暂无可预览的核查报告", "error");
+          return;
+        }
+        el.reportPreviewFrame.srcdoc = buildReportPreviewHtml(
+          getReportContent(currentDetail),
+        );
+        el.reportPreviewModal.classList.add("show");
+        el.reportPreviewModal.setAttribute("aria-hidden", "false");
+        document.body.style.overflow = "hidden";
+      }
+
+      function closeReportPreview() {
+        el.reportPreviewModal.classList.remove("show");
+        el.reportPreviewModal.setAttribute("aria-hidden", "true");
+        el.reportPreviewFrame.srcdoc = "";
+        document.body.style.overflow = "";
+      }
+
+      function exportDetail() {
+        if (!currentDetail) {
+          showToast("暂无可导出的核查详情", "error");
+          return;
+        }
+        const content = buildExportContent(currentDetail);
+        const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `sentiguard-check-${currentDetail.taskId || "detail"}.txt`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+        showToast("核查详情已导出");
+      }
+
+      function toggleAdvancedOptions() {
+        const expanded = el.inputPanel.classList.toggle("show-advanced");
+        el.advancedToggle.textContent = expanded ? "收起选项" : "高级选项";
+      }
+
+      async function checkBackend() {
+        try {
+          await requestJson("/api/health");
+          el.backendStatus.textContent = "后端已连接";
+          el.backendStatus.classList.remove("error");
+        } catch (error) {
+          el.backendStatus.textContent = "后端异常";
+          el.backendStatus.classList.add("error");
+        }
+      }
+
+      async function checkDatabase() {
+        try {
+          const data = await requestJson("/api/health/db");
+          el.dbStatus.textContent = data.database || "数据库正常";
+          el.dbStatus.classList.remove("error");
+        } catch (error) {
+          el.dbStatus.textContent = "数据库异常";
+          el.dbStatus.classList.add("error");
+        }
+      }
+
+      async function analyze(event) {
+        event.preventDefault();
+        const inputText = el.inputText.value.trim();
+        if (!inputText) {
+          showToast("请输入待核查内容", "error");
+          return;
+        }
+        const checkMode = selectedCheckMode;
+        const endpoint =
+          checkMode === "deep"
+            ? "/api/fact-check/analyze/deep"
+            : "/api/fact-check/analyze/quick";
+        const payload = { inputText, checkMode };
+        if (el.hotEventId.value)
+          payload.hotEventId = Number(el.hotEventId.value);
+
+        // 显示加载状态
+        el.resultContainer.className = "empty-state";
+        el.resultContainer.innerHTML = `<div class="empty-state-content"><div class="empty-state-icon">⏳</div><div>正在核查，请稍候...</div></div>`;
+        el.taskMeta.textContent = "正在核查";
+        setAnalyzeButtonsLoading(true, checkMode);
+
+        try {
+          const detail = await requestJson(endpoint, {
+            method: "POST",
+            body: JSON.stringify(payload),
+          });
+          renderDetail(detail);
+          showToast("事实核查完成");
+        } catch (error) {
+          el.taskMeta.textContent = "核查失败";
+          el.resultContainer.className = "empty-state";
+          el.resultContainer.innerHTML = `<div class="empty-state-content"><div class="empty-state-icon">!</div><div>核查失败：${escapeHtml(error.message)}</div></div>`;
+          showToast(error.message, "error");
+        } finally {
+          setAnalyzeButtonsLoading(false, checkMode);
+        }
+      }
+
+      function setAnalyzeButtonsLoading(loading, mode) {
+        el.analyzeBtn.disabled = loading;
+        el.modeSelectBtn.disabled = loading;
+        el.analyzeBtn.textContent = loading
+          ? mode === "deep"
+            ? "深度核查中..."
+            : "快速核查中..."
+          : "开始核查";
+      }
+
+      function renderDetail(detail) {
+        currentDetail = detail;
+        el.inputPanel.classList.add("has-result");
+        el.exportBtn.disabled = false;
+        el.previewReportBtn.disabled = !hasReportContent(detail);
+        const result = detail.result || {};
+        const claims = detail.claims || [];
+        const evidences = detail.evidences || [];
+        const display = normalizeResultDisplay(result);
+        const visibleEvidences = evidences.filter(
+          (evidence) => !isAgentGeneratedEvidence(evidence),
+        );
+
+        el.taskMeta.textContent = `已完成 · ${formatTime(detail.finishTime || detail.submitTime)}`;
+
+        el.resultContainer.className = "";
+        el.resultContainer.innerHTML = `
+        <div class="result-hero">
           <div class="result-band">
             <div>
               <span class="tag ${tagClass(result.label)}">${escapeHtml(normalizeLabelText(result))}</span>
             </div>
-            ${confidence}
+            <span class="muted">${result.confidenceScore == null ? "" : `置信度 ${escapeHtml(result.confidenceScore)}%`}</span>
           </div>
           <div class="analysis">
             <div class="conclusion">${escapeHtml(display.conclusion)}</div>
             <div>${escapeHtml(display.explanation)}</div>
           </div>
         </div>
-      `;
-
-      el.claimEvidenceView.className = '';
-      el.claimEvidenceView.style.display = '';
-      const visibleEvidences = evidences.filter(evidence => !isAgentGeneratedEvidence(evidence));
-      el.claimEvidenceView.innerHTML = `
         <div class="result-summary">
           <div class="summary-item">
             <div class="summary-label">证据数量</div>
@@ -3046,78 +1538,81 @@
           </div>
         </div>
       `;
+      }
 
-      el.reportView.className = 'empty';
-      el.reportView.textContent = '';
-    }
+      function resetPage() {
+        currentDetail = null;
+        el.inputText.value = "";
+        el.hotEventId.value = "";
+        el.inputPanel.classList.remove("show-advanced", "has-result");
+        el.advancedToggle.textContent = "高级选项";
+        el.exportBtn.disabled = true;
+        el.previewReportBtn.disabled = true;
+        el.taskMeta.textContent = "提交后展示核查结论";
+        el.resultContainer.className = "empty-state";
+        el.resultContainer.innerHTML = `
+        <div class="empty-state-content">
+          <div class="empty-state-icon">✓</div>
+          <div>暂无核查结果</div>
+        </div>
+      `;
+      }
 
-    function resetPage() {
-      currentDetail = null;
-      el.inputText.value = '';
-      el.hotEventId.value = '';
-      el.inputPanel.classList.remove('show-advanced', 'has-result');
-      el.advancedToggle.textContent = '高级选项';
-      el.exportBtn.disabled = true;
-      el.previewReportBtn.disabled = true;
-      el.metricTask.textContent = '-';
-      el.metricStatus.textContent = '待提交';
-      el.metricClaims.textContent = '0';
-      el.metricEvidence.textContent = '0';
-      el.taskMeta.textContent = '提交后展示核查结论';
-      el.resultView.className = 'empty';
-      el.resultView.textContent = '暂无核查结果';
-      el.claimEvidenceView.className = 'empty';
-      el.claimEvidenceView.style.display = 'none';
-      el.claimEvidenceView.textContent = '';
-      el.reportView.className = 'empty';
-      el.reportView.textContent = '';
-    }
+      el.form.addEventListener("submit", analyze);
+      el.modeSelectBtn.addEventListener("click", toggleModeMenu);
+      el.modeSelectMenu
+        .querySelectorAll(".mode-select-option")
+        .forEach((option) => {
+          option.addEventListener("click", () =>
+            setCheckMode(option.dataset.checkMode),
+          );
+        });
+      document.addEventListener("click", (event) => {
+        if (!el.checkModeSelector.contains(event.target)) closeModeMenu();
+      });
+      el.resetBtn.addEventListener("click", resetPage);
+      el.advancedToggle.addEventListener("click", toggleAdvancedOptions);
+      el.exportBtn.addEventListener("click", exportDetail);
+      el.previewReportBtn.addEventListener("click", previewReport);
+      el.closeReportPreviewBtn.addEventListener("click", closeReportPreview);
+      el.reportPreviewModal.addEventListener("click", (event) => {
+        if (event.target === el.reportPreviewModal) closeReportPreview();
+      });
+      document.addEventListener("keydown", (event) => {
+        if (
+          event.key === "Escape" &&
+          el.reportPreviewModal.classList.contains("show")
+        )
+          closeReportPreview();
+      });
+      el.logoutBtn.addEventListener("click", logout);
 
-    el.form.addEventListener('submit', analyze);
-    el.modeSelectBtn.addEventListener('click', toggleModeMenu);
-    el.modeSelectMenu.querySelectorAll('.mode-select-option').forEach(option => {
-      option.addEventListener('click', () => setCheckMode(option.dataset.checkMode));
-    });
-    document.addEventListener('click', event => {
-      if (!el.checkModeSelector.contains(event.target)) closeModeMenu();
-    });
-    el.resetBtn.addEventListener('click', resetPage);
-    el.advancedToggle.addEventListener('click', toggleAdvancedOptions);
-    el.exportBtn.addEventListener('click', exportDetail);
-    el.previewReportBtn.addEventListener('click', previewReport);
-    el.closeReportPreviewBtn.addEventListener('click', closeReportPreview);
-    el.reportPreviewModal.addEventListener('click', event => {
-      if (event.target === el.reportPreviewModal) closeReportPreview();
-    });
-    document.addEventListener('keydown', event => {
-      if (event.key === 'Escape' && el.reportPreviewModal.classList.contains('show')) closeReportPreview();
-    });
-    el.logoutBtn.addEventListener('click', logout);
+      if (checkAuth()) {
+        const nickname =
+          localStorage.getItem("sg_nickname") ||
+          localStorage.getItem("sg_username") ||
+          "用户";
+        el.currentUser.textContent = nickname;
+        el.currentUser.classList.remove("error");
+        loadUserInfo();
+      }
 
-    if (checkAuth()) {
-      var nickname = localStorage.getItem('sg_nickname') || localStorage.getItem('sg_username') || '用户';
-      el.currentUser.textContent = nickname;
-      el.currentUser.classList.remove('error');
-      loadUserInfo();
-    }
-
-    async function loadUserInfo() {
-      try {
-        var user = await requestJson('/api/auth/me');
-        el.currentUser.textContent = user.nickname || user.username;
-        localStorage.setItem('sg_nickname', user.nickname || user.username);
-      } catch (e) {
-        // token 无效则跳转
-        if (e.message && e.message.indexOf('401') >= 0 || e.message.indexOf('403') >= 0) {
-          logout();
+      async function loadUserInfo() {
+        try {
+          const user = await requestJson("/api/auth/me");
+          el.currentUser.textContent = user.nickname || user.username;
+          localStorage.setItem("sg_nickname", user.nickname || user.username);
+        } catch (e) {
+          if (
+            e.message &&
+            (e.message.includes("401") || e.message.includes("403"))
+          )
+            logout();
         }
       }
-    }
 
-    checkBackend();
-    checkDatabase();
-  </script>
-</body>
+      checkBackend();
+      checkDatabase();
+    </script>
+  </body>
 </html>
-
-

@@ -1,4 +1,7 @@
-"""百度热搜数据采集器"""
+"""百度热搜数据采集器
+
+通过百度内部 API 获取实时热搜榜，支持 JSON API + HTML 解析双路径回退。
+"""
 from __future__ import annotations
 
 import json
@@ -7,6 +10,12 @@ import re
 from typing import List
 
 import requests
+
+from src.main.python.providers.trending.base import (
+    BaseTrendingCollector,
+    TrendingItem,
+    register_trending_collector,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -22,27 +31,14 @@ HEADERS = {
 }
 
 
-class BaiduHotItem:
-    """百度热搜单条数据"""
-
-    def __init__(self, rank: int, title: str, heat: float, url: str = "", summary: str = ""):
-        self.rank = rank
-        self.title = title
-        self.heat = heat
-        self.url = url
-        self.summary = summary
-
-    def __repr__(self) -> str:
-        return f"#{self.rank} {self.title} (热度:{self.heat})"
-
-
-class BaiduCollector:
+class BaiduCollector(BaseTrendingCollector):
     """百度热搜采集器 — 通过百度内部 API 提取实时热点"""
 
+    SOURCE_NAME = "baidu"
     API_URL = "https://top.baidu.com/api/board?platform=wise&tab=realtime"
     DEFAULT_LIMIT = 50
 
-    def fetch(self, limit: int = DEFAULT_LIMIT) -> List[BaiduHotItem]:
+    def fetch(self, limit: int = DEFAULT_LIMIT) -> List[TrendingItem]:
         """
         拉取百度实时热搜榜单。
 
@@ -92,8 +88,8 @@ class BaiduCollector:
         logger.error("❌ 百度热搜采集彻底失败：所有方式均未获取到数据")
         raise RuntimeError("未能从百度热搜获取到任何数据")
 
-    def _parse_api_json(self, text: str, limit: int = 50) -> List[BaiduHotItem]:
-        """解析 API JSON 返回格式"""
+    def _parse_api_json(self, text: str, limit: int = 50) -> List[TrendingItem]:
+        """解析 API JSON 返回格式，优先使用 hotScore 真实热度值"""
         try:
             data = json.loads(text)
         except json.JSONDecodeError:
@@ -102,39 +98,52 @@ class BaiduCollector:
         if not data.get("success") or "data" not in data:
             return []
 
-        # 找到包含热搜词的 cards
         cards = data["data"].get("cards", [])
-        items: List[BaiduHotItem] = []
+        items: List[TrendingItem] = []
 
         for card in cards:
             content_list = card.get("content", [])
             for content_block in content_list:
-                for item in content_block.get("content", []):
-                    word = item.get("word", "").strip()
+                for item_data in content_block.get("content", []):
+                    word = item_data.get("word", "").strip()
                     if not word or len(word) < 2:
                         continue
-                    url = item.get("url", "")
-                    # 提取热度标签：hotTag 表示热度等级，"1"=热，"2"=爆
-                    hot_tag = item.get("hotTag", "0")
-                    # 基于 hotTag 和 index 计算热度分
-                    index = item.get("index", len(items) + 1)
-                    heat = self._estimate_heat(index, hot_tag)
 
-                    # 提取摘要（如果有 desc 字段）
-                    desc = item.get("desc", "")
+                    url = item_data.get("url", "")
+                    desc = item_data.get("desc", "")
 
-                    items.append(BaiduHotItem(
+                    # 优先使用 API 返回的真实 hotScore，其次用排名估算
+                    hot_score_raw = item_data.get("hotScore")
+                    if hot_score_raw is not None:
+                        try:
+                            heat = min(100.0, max(1.0, float(hot_score_raw)))
+                        except (ValueError, TypeError):
+                            hot_tag = item_data.get("hotTag", "0")
+                            index = item_data.get("index", len(items) + 1)
+                            heat = self._estimate_heat(index, hot_tag)
+                    else:
+                        hot_tag = item_data.get("hotTag", "0")
+                        index = item_data.get("index", len(items) + 1)
+                        heat = self._estimate_heat(index, hot_tag)
+
+                    items.append(TrendingItem(
                         rank=len(items) + 1,
                         title=word,
-                        heat=heat,
+                        heat=round(heat, 1),
                         url=url if url else f"https://www.baidu.com/s?wd={word}",
                         summary=desc,
+                        source_name=self.SOURCE_NAME,
+                        raw_data={
+                            "hotTag": item_data.get("hotTag", "0"),
+                            "index": item_data.get("index", 0),
+                            "hotScore": hot_score_raw,
+                        },
                     ))
 
         return items[:limit]
 
     def _estimate_heat(self, index: int, hot_tag: str) -> float:
-        """根据排名和热度标签估算热度分（0-100）"""
+        """根据排名和热度标签估算热度分（0-100）— 仅在无 hotScore 时作为回退"""
         base = max(100.0 - (index - 1) * 1.8, 10.0)
         if hot_tag == "2":
             base = min(base * 1.3, 100.0)
@@ -142,9 +151,9 @@ class BaiduCollector:
             base = min(base * 1.1, 100.0)
         return round(base, 1)
 
-    def _parse_html(self, html: str, limit: int = 50) -> List[BaiduHotItem]:
+    def _parse_html(self, html: str, limit: int = 50) -> List[TrendingItem]:
         """回退方案：解析 HTML 中的嵌入 JSON 数据"""
-        items: List[BaiduHotItem] = []
+        items: List[TrendingItem] = []
 
         # 尝试找 window.__PRELOADED_STATE__
         match = re.search(
@@ -157,24 +166,36 @@ class BaiduCollector:
                 cards = data.get("data", {}).get("cards", [])
                 for card in cards:
                     for content_block in card.get("content", []):
-                        for item in content_block.get("content", []):
-                            word = item.get("word", "").strip()
+                        for item_data in content_block.get("content", []):
+                            word = item_data.get("word", "").strip()
                             if not word:
                                 continue
-                            idx = item.get("index", len(items) + 1)
-                            hot_tag = item.get("hotTag", "0")
-                            items.append(BaiduHotItem(
+                            idx = item_data.get("index", len(items) + 1)
+                            hot_tag = item_data.get("hotTag", "0")
+                            # HTML 预加载状态中也可能有 hotScore
+                            hot_score_raw = item_data.get("hotScore")
+                            if hot_score_raw is not None:
+                                try:
+                                    heat = min(100.0, max(1.0, float(hot_score_raw)))
+                                except (ValueError, TypeError):
+                                    heat = self._estimate_heat(idx, hot_tag)
+                            else:
+                                heat = self._estimate_heat(idx, hot_tag)
+
+                            items.append(TrendingItem(
                                 rank=len(items) + 1,
                                 title=word,
-                                heat=self._estimate_heat(idx, hot_tag),
-                                url=item.get("url", ""),
-                                summary=item.get("desc", ""),
+                                heat=round(heat, 1),
+                                url=item_data.get("url", ""),
+                                summary=item_data.get("desc", ""),
+                                source_name=self.SOURCE_NAME,
+                                raw_data={"hotTag": hot_tag, "index": idx},
                             ))
                 return items[:limit]
             except (json.JSONDecodeError, KeyError):
                 pass
 
-        # 尝试找其他 JSON 数据模式
+        # 尝试找其他 JSON 数据模式（s-data）
         for pattern in [r'<!--\s*s-data\s*-->\s*<script[^>]*>\s*(\{.*?\})\s*</script>']:
             match = re.search(pattern, html, re.DOTALL)
             if match:
@@ -186,15 +207,20 @@ class BaiduCollector:
                             word = content.get("word", "") or content.get("query", "")
                             if not word:
                                 continue
-                            items.append(BaiduHotItem(
+                            items.append(TrendingItem(
                                 rank=len(items) + 1,
                                 title=word,
                                 heat=float(content.get("hotScore", 50)),
                                 url=content.get("url", ""),
                                 summary=content.get("desc", ""),
+                                source_name=self.SOURCE_NAME,
                             ))
                     return items[:limit]
                 except (json.JSONDecodeError, KeyError, ValueError):
                     continue
 
         return []
+
+
+# 自注册到全局注册表
+register_trending_collector("baidu", BaiduCollector)

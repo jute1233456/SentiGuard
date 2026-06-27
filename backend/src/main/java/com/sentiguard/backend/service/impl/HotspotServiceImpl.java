@@ -7,6 +7,7 @@ import com.sentiguard.backend.entity.TopicKeyword;
 import com.sentiguard.backend.mapper.HotEventMapper;
 import com.sentiguard.backend.mapper.SentimentAnalysisMapper;
 import com.sentiguard.backend.mapper.TopicKeywordMapper;
+import com.sentiguard.backend.config.SentiGuardAgentProperties;
 import com.sentiguard.backend.service.HotspotService;
 import com.sentiguard.backend.vo.*;
 
@@ -27,15 +28,18 @@ public class HotspotServiceImpl implements HotspotService {
     private final TopicKeywordMapper keywordMapper;
     private final SentimentAnalysisMapper sentimentMapper;
     private final RestTemplate agentRestTemplate;
+    private final SentiGuardAgentProperties agentProperties;
 
     public HotspotServiceImpl(HotEventMapper hotEventMapper,
                               TopicKeywordMapper keywordMapper,
                               SentimentAnalysisMapper sentimentMapper,
-                              RestTemplate agentRestTemplate) {
+                              RestTemplate agentRestTemplate,
+                              SentiGuardAgentProperties agentProperties) {
         this.hotEventMapper = hotEventMapper;
         this.keywordMapper = keywordMapper;
         this.sentimentMapper = sentimentMapper;
         this.agentRestTemplate = agentRestTemplate;
+        this.agentProperties = agentProperties;
     }
 
     @Override
@@ -155,11 +159,13 @@ public class HotspotServiceImpl implements HotspotService {
     }
 
     @Override
-    public CollectResultVO triggerCollect() {
-        String url = "http://127.0.0.1:8000/internal/v1/collect?source=BAIDU";
+    public CollectResultVO triggerCollect(String sources) {
+        String src = (sources != null && !sources.trim().isEmpty()) ? sources : "BAIDU";
+        String url = agentProperties.getBaseUrl() + agentProperties.getCollectPath()
+                   + "?sources=" + src;
         try {
             HttpHeaders headers = new HttpHeaders();
-            headers.set("X-Internal-Token", "dev-internal-token");
+            headers.set("X-Internal-Token", agentProperties.getInternalToken());
             HttpEntity<Void> entity = new HttpEntity<>(headers);
 
             ResponseEntity<Map> response = agentRestTemplate.exchange(
